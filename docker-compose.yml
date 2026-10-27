@@ -1,0 +1,24 @@
+services:
+  rigor:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+    image: daily-rigor
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
+    # Submitted C++ runs inside this container, so keep it locked down.
+    read_only: true
+    tmpfs:
+      - /tmp:exec,uid=1000,gid=1000
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
