@@ -27,7 +27,8 @@ const MEMORY_KB = Number(process.env.MEMORY_LIMIT_KB ?? 512 * 1024);
 const MAX_PARALLEL = Number(process.env.MAX_PARALLEL ?? 4);
 const LIMITS = { compile: { n: 12, perMs: 60_000 }, run: { n: 120, perMs: 60_000 } };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
-const FLAGS = ['-O2', '-std=c++20', '-pipe'];
+const PCH_DIR = '/opt/pch'; // precompiled <bits/stdc++.h>, built into the Docker image
+const FLAGS = ['-O2', '-std=c++20', '-pipe', ...(existsSync(PCH_DIR) ? [`-I${PCH_DIR}`] : [])];
 
 /** First C++ compiler that can build a program using <bits/stdc++.h> (Apple's clang cannot). */
 function findCompiler() {
@@ -203,6 +204,22 @@ createServer(async (req, res) => {
       const { id, input, timeLimitMs } = await readJson(req);
       if (typeof id !== 'string' || typeof input !== 'string') return send(400, { error: 'Invalid request.' });
       return send(200, await slot(() => run(id, input, Math.min(Math.max(Number(timeLimitMs) || 2000, 100), 20_000))));
+    }
+    if (req.method === 'POST' && req.url === '/api/runmany') {
+      // Several tests in one round trip: much faster than one request per test on a remote host.
+      const { id, inputs, timeLimitMs } = await readJson(req);
+      if (typeof id !== 'string' || !Array.isArray(inputs) || inputs.length > 50 || inputs.some((x) => typeof x !== 'string')) return send(400, { error: 'Invalid request.' });
+      const limit = Math.min(Math.max(Number(timeLimitMs) || 2000, 100), 20_000);
+      return send(200, await slot(async () => {
+        const results = [];
+        let tles = 0;
+        for (const input of inputs) {
+          const r = await run(id, input, limit);
+          results.push(r);
+          if (r.status === 'tle' && ++tles >= 2) break;
+        }
+        return { results };
+      }));
     }
     if (req.method === 'GET' && STATIC_DIR) {
       const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');

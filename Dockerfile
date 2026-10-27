@@ -15,6 +15,9 @@ RUN npm run build
 # The full bookworm image ships g++ and <bits/stdc++.h>, which the judge needs.
 FROM node:22-bookworm
 WORKDIR /app
+# Precompile <bits/stdc++.h> once (flags must match the judge's) so each submission compiles in a fraction of the time.
+RUN mkdir -p /opt/pch/bits && cp "$(echo '#include <bits/stdc++.h>' | g++ -x c++ -E - | grep -m1 -o '/[^"]*bits/stdc++.h')" /opt/pch/bits/stdc++.h \
+ && g++ -O2 -std=c++20 -x c++-header /opt/pch/bits/stdc++.h -o /opt/pch/bits/stdc++.h.gch
 COPY server server
 COPY --from=build /app/dist dist
 # Set SUPABASE_URL and SUPABASE_ANON_KEY at run time to require sign-in for the judge.

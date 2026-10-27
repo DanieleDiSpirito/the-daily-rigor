@@ -178,30 +178,36 @@ async function judgeCpp(
 
   const results: TestResult[] = [];
   let maxTimeMs = 0, tles = 0;
-  for (let i = 0; i < inputs.length; i++) {
-    onProgress?.(i, inputs.length);
-    const input = inputs[i];
-    const base = { index: i, inputPreview: preview(input) };
-    let r: { status: 'ok' | 'tle' | 're'; stdout: string; timeMs: number; message?: string };
+  type Run = { status: 'ok' | 'tle' | 're'; stdout: string; timeMs: number; message?: string };
+  const CHUNK = 8; // tests per request: one round trip per chunk instead of per test
+  outer: for (let start = 0; start < inputs.length; start += CHUNK) {
+    onProgress?.(start, inputs.length);
+    const chunk = inputs.slice(start, start + CHUNK);
+    let runs: Run[];
     try {
-      r = await post('/api/run', { id, input, timeLimitMs: problem.timeLimitMs });
+      runs = (await post<{ results: Run[] }>('/api/runmany', { id, inputs: chunk, timeLimitMs: problem.timeLimitMs })).results;
     } catch (e) {
-      results.push({ ...base, verdict: 'RE', timeMs: 0, message: failureMessage(e), fullInput: input });
+      const i = start;
+      results.push({ index: i, inputPreview: preview(inputs[i]), verdict: 'RE', timeMs: 0, message: failureMessage(e), fullInput: inputs[i] });
       break;
     }
-    maxTimeMs = Math.max(maxTimeMs, r.timeMs);
-    if (r.status === 'tle') {
-      results.push({ ...base, verdict: 'TLE', timeMs: r.timeMs, message: r.message, fullInput: input });
-      if (++tles >= MAX_TLE) break;
-      continue;
+    for (let k = 0; k < runs.length; k++) {
+      const i = start + k, input = inputs[i], r = runs[k];
+      const base = { index: i, inputPreview: preview(input) };
+      maxTimeMs = Math.max(maxTimeMs, r.timeMs);
+      if (r.status === 'tle') {
+        results.push({ ...base, verdict: 'TLE', timeMs: r.timeMs, message: r.message, fullInput: input });
+        if (++tles >= MAX_TLE) break outer;
+        continue;
+      }
+      if (r.status === 're') { results.push({ ...base, verdict: 'RE', timeMs: r.timeMs, message: r.message, fullInput: input, fullOutput: r.stdout }); continue; }
+      const expected = mode === 'samples' ? problem.samples[i].output : problem.reference(input);
+      const reason = check(input, r.stdout, expected);
+      results.push({
+        ...base, verdict: reason ? 'WA' : 'AC', timeMs: r.timeMs, message: reason ?? undefined, outputPreview: preview(r.stdout), expectedPreview: preview(expected),
+        ...(reason ? { fullInput: input, fullOutput: r.stdout, fullExpected: expected } : {}),
+      });
     }
-    if (r.status === 're') { results.push({ ...base, verdict: 'RE', timeMs: r.timeMs, message: r.message, fullInput: input, fullOutput: r.stdout }); continue; }
-    const expected = mode === 'samples' ? problem.samples[i].output : problem.reference(input);
-    const reason = check(input, r.stdout, expected);
-    results.push({
-      ...base, verdict: reason ? 'WA' : 'AC', timeMs: r.timeMs, message: reason ?? undefined, outputPreview: preview(r.stdout), expectedPreview: preview(expected),
-      ...(reason ? { fullInput: input, fullOutput: r.stdout, fullExpected: expected } : {}),
-    });
   }
   onProgress?.(inputs.length, inputs.length);
   return summarize(results, maxTimeMs);
