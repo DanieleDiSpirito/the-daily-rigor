@@ -8,6 +8,7 @@ import { PaperPage } from './pages/PaperPage';
 import { Archive } from './pages/Archive';
 import { Login } from './pages/Login';
 import { authEnabled, signOut, useAuth } from './lib/auth';
+import { useTheme } from './lib/theme';
 
 const NAV: { to: string; label: string; section?: SectionId }[] = [
   { to: '', label: 'Today' },
@@ -24,6 +25,7 @@ function countdown(ms: number) {
 
 export default function App() {
   const auth = useAuth();
+  const [theme, toggleTheme] = useTheme();
   const route = useRoute();
   const now = useNow();
   const today = dayNumber(now);
@@ -48,6 +50,9 @@ export default function App() {
           <span>No. {today + 1}</span>
           <span>{formatDay(today)}</span>
           <span>Next edition in {countdown(msUntilTomorrow(now))}</span>
+          <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+            {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+          </button>
           {authEnabled && auth.status === 'in' && (
             <span>
               {auth.user.email} · <button className="linklike" onClick={() => signOut()}>sign out</button>

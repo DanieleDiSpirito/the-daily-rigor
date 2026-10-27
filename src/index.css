@@ -25,8 +25,9 @@
   color-scheme: light dark;
 }
 
+/* Dark theme: follows the system unless the reader picked a theme with the toggle (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --paper: #17150f;
     --paper-2: #1f1c15;
     --ink: #ece6d9;
@@ -47,8 +48,33 @@
     --tok-num: #e8b074;
     --tok-com: #8e8676;
     --tok-pre: #d6b574;
+    color-scheme: dark;
   }
 }
+:root[data-theme='dark'] {
+  --paper: #17150f;
+  --paper-2: #1f1c15;
+  --ink: #ece6d9;
+  --ink-2: #c3bba9;
+  --ink-3: #8e8676;
+  --rule: #3a352a;
+  --accent: #d98c7a;
+  --accent-soft: #3a2420;
+  --ok: #8fc49b;
+  --ok-soft: #1f3324;
+  --bad: #e59a8a;
+  --bad-soft: #3d221d;
+  --code-bg: #26221a;
+  --tok-kw: #d98bc0;
+  --tok-ty: #6fc3d3;
+  --tok-fn: #8db6ee;
+  --tok-str: #a3d49a;
+  --tok-num: #e8b074;
+  --tok-com: #8e8676;
+  --tok-pre: #d6b574;
+  color-scheme: dark;
+}
+:root[data-theme='light'] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -297,3 +323,6 @@ pre { background: var(--code-bg); padding: 10px 12px; border-radius: 4px; margin
 .submissions .sub-code td { padding: 0 8px 12px; }
 .submissions .sub-code pre { max-height: 360px; margin-top: 6px; }
 .submissions .sub-code pre.msg { white-space: pre-wrap; color: var(--bad); background: var(--bad-soft); max-height: 160px; }
+
+.theme-toggle { background: none; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink-2); font: inherit; font-family: var(--sans); font-size: 13px; padding: 1px 10px; cursor: pointer; }
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
