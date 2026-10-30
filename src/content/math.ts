@@ -1,6 +1,8 @@
 import type { MathPuzzle } from '../types';
+import { withRlWeek } from './schedule';
+import { rlMathPuzzles } from './rl-math';
 
-export const mathPuzzles: MathPuzzle[] = [
+const regularPuzzles: MathPuzzle[] = [
   {
     id: 'poisoned-cask-ternary',
     title: 'The Poisoned Cask, Revisited',
@@ -457,3 +459,6 @@ Evaluating gives $D_{10} = 1334961$. Equivalently, the derangement numbers satis
 Since $\\sum (-1)^k/k! \\to 1/e$, the fraction of permutations that are derangements is already within $10^{-7}$ of $1/e \\approx 0.3679$ for $n = 10$.`,
   },
 ];
+
+/** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */
+export const mathPuzzles: MathPuzzle[] = withRlWeek(regularPuzzles, rlMathPuzzles);

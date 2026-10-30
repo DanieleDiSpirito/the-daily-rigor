@@ -1,5 +1,7 @@
 import type { CodingProblem, TestCase } from '../types';
 import { rng, tokens } from '../lib/rng';
+import { withRlWeek } from './schedule';
+import { rlCodingProblems } from './rl-code';
 
 const T = (input: string): TestCase => ({ input });
 
@@ -1022,8 +1024,11 @@ const shortestCover: CodingProblem = {
 Each pointer advances at most $n$ times, so the running time is $O(n)$. The sums reach $2 \\cdot 10^{14}$, beyond 32-bit integers (but still exact in JavaScript numbers). With negative values the monotonicity breaks and a different approach (prefix sums with a monotone deque) is required.`,
 };
 
-export const codingProblems: CodingProblem[] = [
+const regularProblems: CodingProblem[] = [
   rangeXor, noNeighbours, divisibleSubarrays, craters, routers, window, sumFloors,
   pairSums, longestRise, fewestCoins, mazeRunner, cheapestNetwork, nextTaller, primeCensus,
   chooseMod, lootBag, wordMorph, friendCircles, circularFortune, paintCoverage, shortestCover,
 ];
+
+/** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */
+export const codingProblems: CodingProblem[] = withRlWeek(regularProblems, rlCodingProblems);

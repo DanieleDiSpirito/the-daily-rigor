@@ -102,6 +102,59 @@ for (let it = 0; it < 200; it++) {
     for (let i = 0; i < n; i++) { let s = 0; for (let j = i; j < n; j++) { s += a[j]; if (s >= S) { best = Math.min(best, j - i + 1); break; } } }
     if (!same(ref('shortest-cover', `${n} ${S}\n${a.join(' ')}`), String(best === Infinity ? -1 : best))) fail(`cover ${a} ${S}`); }
 }
+
+// ---- Reinforcement-learning week: independent brute-force checks ----
+{
+  const P = 998244353n;
+  const md = (x: bigint) => ((x % P) + P) % P;
+  const pw = (b: bigint, e: bigint) => { let res = 1n; b = md(b); while (e > 0n) { if (e & 1n) res = (res * b) % P; b = (b * b) % P; e >>= 1n; } return res; };
+  const inv = (x: bigint) => pw(x, P - 2n);
+  for (let it = 0; it < 300; it++) {
+    { // returns-to-go: direct discounted sums to the end of each episode
+      const n = r.int(1, 9), a = r.int(0, 6), b = r.int(Math.max(a, 1), 7); const rs = Array.from({ length: n }, () => r.int(-9, 9)); const ds = Array.from({ length: n }, (_, i) => (i === n - 1 || r.next() < 0.3 ? 1 : 0));
+      const g = BigInt(a) * inv(BigInt(b)) % P; const exp: string[] = [];
+      for (let i = 0; i < n; i++) { let tot = 0n, f = 1n; for (let k = i; k < n; k++) { tot = md(tot + f * BigInt(rs[k])); f = f * g % P; if (ds[k]) break; } exp.push(String(tot)); }
+      if (!same(ref('returns-to-go', `${n} ${a} ${b}\n${rs.join(' ')}\n${ds.join(' ')}\n`), exp.join(' '))) fail(`returns ${rs} ${ds} ${a}/${b}`); }
+    { // q-table-rewind: independent simulation with explicit rounding towards zero
+      const S = r.int(1, 4), A = r.int(1, 3), Tn = r.int(1, 25); const tr = Array.from({ length: Tn }, () => [r.int(0, S - 1), r.int(0, A - 1), r.int(-12, 12), r.int(0, S - 1)]);
+      const q = Array.from({ length: S }, () => new Array<number>(A).fill(0));
+      for (const [s0, a0, rw, s1] of tr) { let best = -Infinity; for (let b = 0; b < A; b++) best = Math.max(best, q[s1][b]); const x = rw + best - q[s0][a0]; q[s0][a0] += x >= 0 ? Math.floor(x / 2) : -Math.floor(-x / 2); }
+      if (!same(ref('q-table-rewind', `${S} ${A} ${Tn}\n${tr.map((e) => e.join(' ')).join('\n')}\n`), q.map((row) => row.join(' ')).join('\n'))) fail(`q-table ${JSON.stringify(tr)}`); }
+    { // first-visit-values: forward scan summing the rewards that follow the first visit
+      const N = r.int(1, 5), E = r.int(1, 4); const eps = Array.from({ length: E }, () => Array.from({ length: r.int(1, 6) }, () => [r.int(0, N - 1), r.int(-9, 9)]));
+      const sum = new Array<number>(N).fill(0), cnt = new Array<number>(N).fill(0);
+      for (const ep of eps) for (let t = 0; t < ep.length; t++) if (ep.findIndex(([s0]) => s0 === ep[t][0]) === t) { sum[ep[t][0]] += ep.slice(t).reduce((acc, [, rw]) => acc + rw, 0); cnt[ep[t][0]]++; }
+      const g2 = (x: number, y: number): number => (y ? g2(y, x % y) : Math.abs(x));
+      const exp = sum.map((v, i) => (cnt[i] ? `${v / g2(v, cnt[i])}/${cnt[i] / g2(v, cnt[i])}` : '-'));
+      if (!same(ref('first-visit-values', `${N} ${E}\n${eps.map((ep) => `${ep.length} ${ep.map((e) => e.join(' ')).join(' ')}`).join('\n')}\n`), exp.join(' '))) fail(`first-visit ${JSON.stringify(eps)}`); }
+    { // corridor-hitting-time: exact rational Gaussian elimination
+      const n = r.int(1, 6); const pr = Array.from({ length: n - 1 }, () => { const b = r.int(1, 9); return [r.int(1, b), b]; });
+      type Fr = [bigint, bigint]; const gc = (x: bigint, y: bigint): bigint => (y ? gc(y, x % y) : x < 0n ? -x : x);
+      const nf = (x: bigint, y: bigint): Fr => { if (y < 0n) { x = -x; y = -y; } const d = gc(x, y) || 1n; return [x / d, y / d]; };
+      const add = (u: Fr, v: Fr) => nf(u[0] * v[1] + v[0] * u[1], u[1] * v[1]), mul = (u: Fr, v: Fr) => nf(u[0] * v[0], u[1] * v[1]), dv = (u: Fr, v: Fr) => nf(u[0] * v[1], u[1] * v[0]);
+      const M: Fr[][] = Array.from({ length: n }, () => new Array<Fr>(n + 1).fill([0n, 1n]));
+      M[0][0] = [1n, 1n]; if (n > 1) M[0][1] = [-1n, 1n]; M[0][n] = [1n, 1n];
+      for (let i = 1; i < n; i++) { const [a0, b0] = pr[i - 1]; M[i][i] = [1n, 1n]; M[i][i - 1] = nf(-BigInt(b0 - a0), BigInt(b0)); if (i + 1 < n) M[i][i + 1] = nf(-BigInt(a0), BigInt(b0)); M[i][n] = [1n, 1n]; }
+      for (let c = 0; c < n; c++) { let piv = c; while (M[piv][c][0] === 0n) piv++; [M[c], M[piv]] = [M[piv], M[c]]; for (let rr = 0; rr < n; rr++) if (rr !== c && M[rr][c][0] !== 0n) { const f = dv(M[rr][c], M[c][c]); for (let k = c; k <= n; k++) M[rr][k] = add(M[rr][k], mul([-f[0], f[1]], M[c][k])); } }
+      const e0 = dv(M[0][n], M[0][0]);
+      if (!same(ref('corridor-policy-eval', `${n}\n${pr.map((e) => e.join(' ')).join('\n')}\n`), String(md(e0[0]) * inv(e0[1]) % P))) fail(`corridor ${JSON.stringify(pr)}`); }
+    { // replay-sum-tree: linear scan over the prefix sums
+      const n = r.int(1, 8), q = r.int(1, 14); const pri = Array.from({ length: n }, () => r.int(0, 5)); if (!pri.some((x) => x > 0)) pri[0] = 2; const cur = [...pri]; const lines: string[] = []; const exp: number[] = [];
+      for (let k = 0; k < q; k++) { if (r.next() < 0.4) { const i = r.int(0, n - 1), x = r.int(0, 5); const old = cur[i]; cur[i] = x; if (!cur.some((y) => y > 0)) cur[i] = old; lines.push(`1 ${i + 1} ${cur[i]}`); }
+        else { const tot = cur.reduce((a, b) => a + b, 0), v = r.int(0, tot - 1); let acc = 0, idx = 0; for (let i = 0; i < n; i++) { acc += cur[i]; if (acc > v) { idx = i + 1; break; } } lines.push(`2 ${v}`); exp.push(idx); } }
+      if (exp.length && !same(ref('replay-sum-tree', `${n} ${q}\n${pri.join(' ')}\n${lines.join('\n')}\n`), exp.join(' '))) fail(`sum-tree ${pri} ${lines}`); }
+    { // n-step-targets: direct sums, O(T n)
+      const Tn = r.int(1, 9), n = r.int(1, Tn), a = r.int(1, 6), b = r.int(a, 7); const rs = Array.from({ length: Tn }, () => r.int(-9, 9)), vs = Array.from({ length: Tn + 1 }, () => r.int(-9, 9));
+      const g = BigInt(a) * inv(BigInt(b)) % P; const exp: string[] = [];
+      for (let t = 0; t < Tn; t++) { const m = Math.min(n, Tn - t); let tot = 0n, f = 1n; for (let k = 0; k < m; k++) { tot = md(tot + f * BigInt(rs[t + k])); f = f * g % P; } exp.push(String(md(tot + f * BigInt(vs[t + m])))); }
+      if (!same(ref('n-step-targets', `${Tn} ${n} ${a} ${b}\n${rs.join(' ')}\n${vs.join(' ')}\n`), exp.join(' '))) fail(`n-step ${rs} ${vs} ${n} ${a}/${b}`); }
+    { // optimal-plan-count: enumerate every path
+      const n = r.int(2, 6); const es: number[][] = []; for (let i = 1; i < n; i++) es.push([i, i + 1, r.int(-2, 2)]); for (let k = r.int(0, 6); k > 0; k--) { const u = r.int(1, n - 1); es.push([u, r.int(u + 1, n), r.int(-2, 2)]); }
+      let best = -Infinity, cnt = 0; const dfs = (u: number, tot: number) => { if (u === n) { if (tot > best) { best = tot; cnt = 1; } else if (tot === best) cnt++; return; } for (const [x, y, w] of es) if (x === u) dfs(y, tot + w); };
+      dfs(1, 0);
+      if (!same(ref('optimal-plan-count', `${n} ${es.length}\n${es.map((e) => e.join(' ')).join('\n')}\n`), `${best} ${cnt}`)) fail(`plans ${JSON.stringify(es)}`); }
+  }
+}
 // Binomials mod p against exact BigInt Pascal rows.
 { const P = 1_000_000_007n; const qs: [number, number][] = []; const exp: bigint[] = [];
   for (let n = 0; n <= 120; n += 7) { let c = 1n; for (let k = 0; k <= n; k++) { qs.push([n, k]); exp.push(c % P); c = (c * BigInt(n - k)) / BigInt(k + 1); } }
@@ -137,17 +190,29 @@ const mc: Record<string, () => number> = {
   'three-heads-in-a-row': () => { let s = 0; for (let i = 0; i < N; i++) { let n = 0, run = 0; while (run < 3) { n++; run = Math.random() < 0.5 ? run + 1 : 0; } s += n; } return s / N; },
   'cube-walk': () => { let s = 0; for (let i = 0; i < N; i++) { let v = 0, n = 0; while (v !== 7) { v ^= 1 << Math.floor(Math.random() * 3); n++; } s += n; } return s / N; },
   'hundred-prisoners': () => { const T = 40_000; let ok = 0; for (let t = 0; t < T; t++) { const p = Array.from({ length: 100 }, (_, i) => i); for (let j = 99; j > 0; j--) { const k = Math.floor(Math.random() * (j + 1)); [p[j], p[k]] = [p[k], p[j]]; } const seen = new Array<boolean>(100).fill(false); let good = true; for (let i = 0; i < 100 && good; i++) if (!seen[i]) { let len = 0, x = i; while (!seen[x]) { seen[x] = true; x = p[x]; len++; } if (len > 50) good = false; } if (good) ok++; } return ok / T; },
+  // Reinforcement-learning week (each answer is recomputed independently, see the tolerance note below).
+  'two-state-chain': () => { let a = 0, b = 0; for (let i = 0; i < 200; i++) { const na = 1 + 0.5 * (0.5 * a + 0.5 * b), nb = 0.5 * ((1 / 3) * a + (2 / 3) * b); a = na; b = nb; } return a; },
+  'sarsa-vs-q': () => { const q = 2 + 0.5 * (1 + 0.9 * 5 - 2), s = 2 + 0.5 * (1 + 0.9 * 4 - 2); return q - s; },
+  'corridor-hitting-time': () => { const n = 10, M = Array.from({ length: n }, () => new Array<number>(n + 1).fill(0)); M[0][0] = 1; M[0][1] = -1; M[0][n] = 1; for (let i = 1; i < n; i++) { M[i][i] = 1; M[i][i - 1] = -0.5; if (i + 1 < n) M[i][i + 1] = -0.5; M[i][n] = 1; } for (let c = 0; c < n; c++) { for (let rr = 0; rr < n; rr++) if (rr !== c) { const f = M[rr][c] / M[c][c]; for (let k = c; k <= n; k++) M[rr][k] -= f * M[c][k]; } } return Math.round(M[0][n] / M[0][0]); },
+  'discounted-walk': () => { const g = 0.9, V = [0, 0, 0, 0]; for (let it = 0; it < 2000; it++) { const n = [g * V[1], g * 0.5 * (V[0] + V[2]), g * 0.5 * (V[1] + V[3]), 0.5 * 1 + g * 0.5 * V[2]]; for (let i = 0; i < 4; i++) V[i] = n[i]; } return V[0]; },
+  'value-iteration-bound': () => { let k = 0; while (10 * 0.9 ** k >= 0.01) k++; return k; },
+  'step-size-memory': () => { let n = 0; while (0.9 ** n >= 0.01) n++; return n; },
+  'importance-sampling-variance': () => { const b = [0.5, 0.25, 0.25], pi = [0, 0.5, 0.5], R = [1, 2, 3]; let m = 0, m2 = 0; for (let i = 0; i < 3; i++) { m += b[i] * (pi[i] / b[i]) * R[i]; m2 += b[i] * ((pi[i] / b[i]) * R[i]) ** 2; } return m2 - m * m; },
   'ants-collisions': () => { let best = 0; for (let r = 0; r <= 25; r++) best = Math.max(best, r * (25 - r)); return best; },
 };
 for (const p of mathPuzzles) {
   const f = mc[p.id];
   if (!f) { fail(`no check for ${p.id}`); continue; }
   const v = f();
-  const tol = Math.max(p.tolerance, 0) === 0 ? 0 : 0.02;
+  const rlExact = ['two-state-chain', 'sarsa-vs-q', 'discounted-walk', 'importance-sampling-variance'].includes(p.id);
+  const tol = rlExact ? 1e-9 : Math.max(p.tolerance, 0) === 0 ? 0 : 0.02;
   const ok = tol === 0 ? v === p.answer : Math.abs(v - p.answer) <= tol * Math.max(1, p.answer);
   console.log(`${p.id}: expected ${p.answer.toFixed(4)}, check ${v.toFixed(4)} ${ok ? 'ok' : 'MISMATCH'}`);
   if (!ok) fail(p.id);
 }
+
+// Ids must be unique across the three sections too (progress is keyed by id).
+{ const ids = [...mathPuzzles, ...codingProblems, ...papers].map((x) => x.id); const dup = ids.filter((x, i) => ids.indexOf(x) !== i); if (dup.length) fail(`duplicate ids: ${dup}`); }
 
 // Quiz sanity and math rendering.
 for (const p of papers) for (const [i, q] of p.quiz.entries()) if (q.correct < 0 || q.correct >= q.options.length) fail(`${p.id} q${i}`);

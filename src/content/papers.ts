@@ -1,6 +1,8 @@
 import type { Paper } from '../types';
+import { withRlWeek } from './schedule';
+import { rlPapers } from './rl-papers';
 
-export const papers: Paper[] = [
+const regularPapers: Paper[] = [
   {
     id: 'vaswani-2017',
     title: 'Attention Is All You Need',
@@ -1617,3 +1619,6 @@ He shows that, under assumptions plausible for many fields, the PPV falls below 
     ],
   },
 ];
+
+/** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */
+export const papers: Paper[] = withRlWeek(regularPapers, rlPapers);
