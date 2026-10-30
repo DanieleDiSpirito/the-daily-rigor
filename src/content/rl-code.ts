@@ -313,8 +313,8 @@ so that transition $i$ is chosen with probability proportional to $p_i$. Priorit
   },
   editorial: `Naively, a sample scans the priorities in $O(n)$, far too slow for $2 \\cdot 10^5$ queries. The DQN-style prioritised replay buffer uses a **sum tree** for exactly this reason; a **Fenwick tree** (binary indexed tree) over the priorities does the same job in a few lines.
 
-* **Update**: add $x - p_i$ to the $O(\\log n)$ nodes covering $i$.
-* **Sample**: we want the smallest $i$ with $p_1 + \\dots + p_i > v$. Walk down the implicit tree from the largest power of two $2^k \\le n$: keep a position $idx$ (initially 0) and, for $step = 2^k, 2^{k-1}, \\dots, 1$, if $idx + step \\le n$ and the node $tree[idx + step]$ (the sum of the $step$ elements after $idx$) is **at most** $v$, jump: $idx \\mathrel{+}= step$ and $v \\mathrel{-}= tree[idx]$. At the end $idx$ is the largest index whose prefix sum is $\\le v$, so the answer is $idx + 1$.
+- **Update**: add $x - p_i$ to the $O(\\log n)$ nodes covering $i$.
+- **Sample**: we want the smallest $i$ with $p_1 + \\dots + p_i > v$. Walk down the implicit tree from the largest power of two $2^k \\le n$: keep a position $idx$ (initially 0) and, for $step = 2^k, 2^{k-1}, \\dots, 1$, if $idx + step \\le n$ and the node $tree[idx + step]$ (the sum of the $step$ elements after $idx$) is **at most** $v$, jump: $idx \\mathrel{+}= step$ and $v \\mathrel{-}= tree[idx]$. At the end $idx$ is the largest index whose prefix sum is $\\le v$, so the answer is $idx + 1$.
 
 Both operations are $O(\\log n)$, for $O((n + q)\\log n)$ in total. Sums reach $2 \\cdot 10^{14}$, so 64-bit integers are required. The "at most" in the descent is what skips elements of priority 0: they never make the prefix sum exceed $v$ on their own.`,
 };
