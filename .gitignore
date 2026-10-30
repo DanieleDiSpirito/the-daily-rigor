@@ -16,3 +16,6 @@ dist-single
 .DS_Store
 .vscode
 .idea
+
+# local notes, not published
+DEPLOY.md
