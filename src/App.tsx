@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { dayNumber, formatDay, isReleased, msUntilTomorrow, pools } from './lib/daily';
 import { href, useNow, useRoute } from './lib/router';
 import type { SectionId } from './types';
@@ -7,7 +8,8 @@ import { CodePage } from './pages/CodePage';
 import { PaperPage } from './pages/PaperPage';
 import { Archive } from './pages/Archive';
 import { Login } from './pages/Login';
-import { authEnabled, signOut, useAuth } from './lib/auth';
+import { authEnabled, leaveGuest, signOut, useAuth } from './lib/auth';
+import { announceSignIn } from './lib/judge';
 import { useTheme } from './lib/theme';
 
 const NAV: { to: string; label: string; section?: SectionId }[] = [
@@ -26,13 +28,15 @@ function countdown(ms: number) {
 export default function App() {
   const auth = useAuth();
   const [theme, toggleTheme] = useTheme();
+  const signedIn = auth.status === 'in';
+  useEffect(() => { if (signedIn) announceSignIn(); }, [signedIn]);
   const route = useRoute();
   const now = useNow();
   const today = dayNumber(now);
   const [head, id] = route;
 
   let page;
-  const locked = authEnabled && auth.status !== 'in';
+  const locked = authEnabled && auth.status !== 'in' && auth.status !== 'guest';
   const known = (s: SectionId) => !id || (pools[s].some((x) => x.id === id) && isReleased(s, id, today));
   if (head === 'math' && known('math')) page = <MathPage today={today} id={id} />;
   else if (head === 'code' && known('code')) page = <CodePage today={today} id={id} />;
@@ -53,6 +57,11 @@ export default function App() {
           <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
             {theme === 'dark' ? '☀ Light' : '☾ Dark'}
           </button>
+          {authEnabled && auth.status === 'guest' && (
+            <span>
+              Guest · saved in this browser · <button className="linklike" onClick={leaveGuest}>sign in</button>
+            </span>
+          )}
           {authEnabled && auth.status === 'in' && (
             <span>
               {auth.user.email} · <button className="linklike" onClick={() => signOut()}>sign out</button>

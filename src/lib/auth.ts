@@ -4,8 +4,10 @@ import { attachCloud } from './cloud';
 
 /**
  * Sign-in with Google or GitHub through Supabase Auth (PKCE flow, so the hash router is untouched).
- * Access is invite-only: the database function `am_i_allowed()` checks the user's verified email
- * against the `allowed_emails` table. Without VITE_SUPABASE_* the app runs locally with no login.
+ * The database function `am_i_allowed()` decides who may enter: by default any verified email, or
+ * only the `allowed_emails` list if the owner chose invite-only mode (see supabase/schema.sql).
+ * Visitors may also continue as guests: everything except the C++ judge works, and progress stays
+ * in this browser's localStorage. Without VITE_SUPABASE_* the app runs locally with no login at all.
  */
 const url = import.meta.env?.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -20,9 +22,29 @@ export type AuthState =
   | { status: 'loading' }
   | { status: 'out'; error?: string }
   | { status: 'denied'; email?: string }
+  | { status: 'guest' }
   | { status: 'in'; user: User };
 
+const GUEST_KEY = 'daily-rigor/guest/v1';
+const readGuest = () => {
+  try { return localStorage.getItem(GUEST_KEY) === '1'; } catch { return false; }
+};
+/** True while the visitor is browsing as a guest (no account, no cloud sync, no C++ judge). */
+export const guestMode = () => authEnabled && readGuest();
+
+export function continueAsGuest() {
+  try { localStorage.setItem(GUEST_KEY, '1'); } catch { /* storage unavailable: the choice lasts until reload */ }
+  window.location.reload();
+}
+
+/** Leaves guest mode and shows the sign-in page (progress made as a guest stays in the browser and is adopted by the account). */
+export function leaveGuest() {
+  try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
+  window.location.reload();
+}
+
 export async function signIn(provider: Provider) {
+  try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
   await supabase?.auth.signInWithOAuth({ provider, options: { redirectTo: window.location.origin + window.location.pathname } });
 }
 
@@ -48,7 +70,7 @@ export function useAuth(): AuthState {
 
     const check = async (user: User | null) => {
       if (!alive) return;
-      if (!user) { current = null; setState({ status: 'out' }); return; }
+      if (!user) { current = null; setState(readGuest() ? { status: 'guest' } : { status: 'out' }); return; }
       if (current === user.id) return; // token refresh for the same user
       const { data, error } = await supabase!.rpc('am_i_allowed');
       if (!alive) return;

@@ -25,7 +25,10 @@ const AUTH = !!(SUPABASE_URL && SUPABASE_KEY);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN; // e.g. https://rigor.example.com; unset = same-origin only when AUTH is on
 const MEMORY_KB = Number(process.env.MEMORY_LIMIT_KB ?? 512 * 1024);
 const MAX_PARALLEL = Number(process.env.MAX_PARALLEL ?? 4);
-const LIMITS = { compile: { n: 12, perMs: 60_000 }, run: { n: 120, perMs: 60_000 } };
+const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 50); // jobs allowed to wait for a free slot; beyond that, answer 503
+const NTFY_URL = process.env.NTFY_URL; // optional, e.g. https://ntfy.sh/<long-random-topic>: notified when someone signs in
+const NTFY_TOKEN = process.env.NTFY_TOKEN; // optional access token for a protected ntfy topic
+const LIMITS = { compile: { n: 12, perMs: 60_000 }, run: { n: 120, perMs: 60_000 }, hello: { n: 6, perMs: 60_000 } };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
 const PCH_DIR = '/opt/pch'; // precompiled <bits/stdc++.h>, built into the Docker image
 const FLAGS = ['-O2', '-std=c++20', '-pipe', ...(existsSync(PCH_DIR) ? [`-I${PCH_DIR}`] : [])];
@@ -158,9 +161,41 @@ function allow(uid, kind) {
 let active = 0;
 const waiting = [];
 async function slot(fn) {
-  if (active >= MAX_PARALLEL) await new Promise((r) => waiting.push(r));
+  if (active >= MAX_PARALLEL) {
+    if (waiting.length >= MAX_QUEUE) throw Object.assign(new Error('busy'), { busy: true });
+    await new Promise((r) => waiting.push(r));
+  }
   active++;
   try { return await fn(); } finally { active--; waiting.shift()?.(); }
+}
+
+/** Tells the owner (through ntfy) that someone signed in. The token is checked by Supabase, which also returns the verified email and provider. */
+const announced = new Map();
+const PROVIDERS = { google: 'Google', github: 'GitHub' };
+async function announceSignIn(req, uid) {
+  if (!AUTH || !NTFY_URL) return;
+  const now = Date.now();
+  if ((announced.get(uid) ?? 0) > now - 30 * 60_000) return; // at most one notification per user every 30 minutes
+  announced.set(uid, now);
+  if (announced.size > 5000) announced.clear();
+  try {
+    const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return;
+    const user = await res.json();
+    // oxlint-disable-next-line no-control-regex -- stripping control characters is the point
+    const clean = (v) => String(v ?? 'sconosciuto').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200);
+    const raw = user.app_metadata?.provider;
+    const provider = PROVIDERS[raw] ?? clean(raw);
+    await fetch(NTFY_URL, {
+      method: 'POST',
+      headers: { Title: 'The Daily Rigor', Tags: 'bust_in_silhouette', ...(NTFY_TOKEN ? { Authorization: `Bearer ${NTFY_TOKEN}` } : {}) },
+      body: `accesso effettuato da ${clean(user.email)} tramite ${provider}`,
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (e) {
+    console.error('ntfy notification failed:', e?.name ?? 'error'); // never log the URL: the topic name is the secret
+  }
 }
 
 function readJson(req) {
@@ -192,8 +227,12 @@ createServer(async (req, res) => {
     let uid = 'local';
     if (AUTH && req.method === 'POST' && req.url?.startsWith('/api/')) {
       uid = await authenticate(req);
-      if (!uid) return send(401, { error: 'Sign in with an invited account.' });
-      if (!allow(uid, req.url === '/api/compile' ? 'compile' : 'run')) return send(429, { error: 'Too many requests.' });
+      if (!uid) return send(401, { error: 'Sign in to use the C++ judge.' });
+      if (!allow(uid, req.url === '/api/compile' ? 'compile' : req.url === '/api/hello' ? 'hello' : 'run')) return send(429, { error: 'Too many requests.' });
+    }
+    if (req.method === 'POST' && req.url === '/api/hello') {
+      await announceSignIn(req, uid);
+      return send(200, { ok: true });
     }
     if (req.method === 'POST' && req.url === '/api/compile') {
       const { code } = await readJson(req);
@@ -230,6 +269,7 @@ createServer(async (req, res) => {
     }
     send(404, { error: 'Not found' });
   } catch (e) {
+    if (e?.busy) return send(503, { error: 'The judge is busy. Try again in a moment.' });
     send(400, { error: String(e?.message ?? e) });
   }
 }).listen(PORT, HOST, () => console.log(`Judge listening on http://${HOST}:${PORT} (compiler: ${CXX}, auth: ${AUTH ? 'on' : 'off'})`));

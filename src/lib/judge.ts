@@ -145,10 +145,20 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`${JUDGE_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
-  if (res.status === 401 || res.status === 403) throw new Error('Not signed in, or not invited. Sign in again.');
+  if (res.status === 401 || res.status === 403) throw new Error('Sign in to use the C++ judge (guests can use JavaScript).');
   if (res.status === 429) throw new Error('Too many submissions. Wait a moment and try again.');
+  if (res.status === 503) throw new Error('The judge is busy. Try again in a moment.');
   if (!res.ok) throw new Error(`Judge server answered ${res.status}.`);
   return (await res.json()) as T;
+}
+
+/** Lets the server know that someone signed in (it may notify the owner). Once per browser session; failures are ignored. */
+export async function announceSignIn() {
+  try {
+    if (sessionStorage.getItem('daily-rigor/hello') === '1') return;
+    sessionStorage.setItem('daily-rigor/hello', '1');
+    await post('/api/hello', {});
+  } catch { /* the notification is optional */ }
 }
 
 const SERVER_DOWN = 'Cannot reach the C++ judge server. Start it with `npm run judge` (or run everything with `npm run docker`) and try again.';

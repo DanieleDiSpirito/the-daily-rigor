@@ -3,6 +3,7 @@ import { highlight } from '../lib/highlight';
 import { codingProblems } from '../content/code';
 import { dailyIndex } from '../lib/daily';
 import { getAttempt, updateAttempt, useProgress, type Ctx } from '../lib/progress';
+import { guestMode } from '../lib/auth';
 import { judge, STARTER_CODE, STARTER_CODE_CPP, usingInlineRunner, VERDICT_LABEL, type JudgeReport, type Language } from '../lib/judge';
 import { Rich } from '../components/Rich';
 import { CodeEditor } from '../components/CodeEditor';
@@ -18,7 +19,8 @@ export function CodePage({ today, id }: { today: number; id?: string }) {
   const ctx: Ctx = isDaily ? today : 'practice';
   const a = getAttempt('code', problem.id, ctx);
 
-  const [lang, setLang] = useState<Language>(a?.lang ?? 'js');
+  const guest = guestMode();
+  const [lang, setLang] = useState<Language>(guest ? 'js' : a?.lang ?? 'js');
   const [jsCode, setJsCode] = useState(a?.code ?? STARTER_CODE);
   const [cppCode, setCppCode] = useState(a?.codeCpp ?? STARTER_CODE_CPP);
   const code = lang === 'cpp' ? cppCode : jsCode;
@@ -117,7 +119,7 @@ export function CodePage({ today, id }: { today: number; id?: string }) {
                 Solution ·{' '}
                 <select value={lang} disabled={!!running} onChange={(e) => { setLang(e.target.value as Language); setReport(null); setErrorLines([]); updateAttempt('code', problem.id, ctx, { lang: e.target.value as Language }); }} aria-label="Language">
                   <option value="js">JavaScript</option>
-                  <option value="cpp">C++20</option>
+                  <option value="cpp" disabled={guest}>{guest ? 'C++20 (sign in)' : 'C++20'}</option>
                 </select>
               </span>
               {confirmReset ? (

@@ -1,10 +1,10 @@
-import { signIn, signOut, type AuthState } from '../lib/auth';
+import { continueAsGuest, signIn, signOut, type AuthState } from '../lib/auth';
 
 export function Login({ state }: { state: AuthState }) {
   return (
     <article className="page login">
       <div className="challenge-heading">
-        <div className="kicker">Invitation only</div>
+        <div className="kicker">Welcome</div>
         <h1>Sign in to The Daily Rigor</h1>
       </div>
       <section className="panel">
@@ -12,7 +12,7 @@ export function Login({ state }: { state: AuthState }) {
         {state.status === 'denied' && (
           <>
             <p className="feedback bad">
-              {state.email ? <strong>{state.email}</strong> : 'This account'} is not on the invitation list. Ask the owner to add the email address of your Google or GitHub account.
+              {state.email ? <strong>{state.email}</strong> : 'This account'} cannot be used here: it needs a verified email address and, if the owner has restricted access, a place on the invitation list.
             </p>
             <button className="btn ghost" onClick={() => signOut()}>Use another account</button>
           </>
@@ -28,7 +28,12 @@ export function Login({ state }: { state: AuthState }) {
               <button className="btn primary" onClick={() => signIn('google')}>Continue with Google</button>
               <button className="btn" onClick={() => signIn('github')}>Continue with GitHub</button>
             </div>
-            <p className="hint-text">We only receive your name and email address, to recognise you and to keep your progress and streaks.</p>
+            <p className="hint-text">We only receive your name and email address, to recognise you and to keep your progress and streaks. The site owner may be notified when someone signs in.</p>
+            <hr />
+            <p>
+              Just looking around? You can <button className="linklike" onClick={continueAsGuest}>continue as a guest</button>. Everything works except the C++ judge,
+              and your progress is saved only in this browser, so it can be lost if you clear your browsing data.
+            </p>
           </>
         )}
       </section>

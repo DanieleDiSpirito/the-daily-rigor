@@ -43,7 +43,8 @@ The library holds **28 items per section** (28 puzzles, 28 algorithm problems, 2
 - **Submission history**: every submission, accepted or not, is saved with its code, language, verdict and time, and can be loaded back into the editor.
 - **Archive** of past editions with category filters. Only challenges that have already been released are listed, so tomorrow's problem stays hidden.
 - **Light and dark themes** with a toggle (follows the system until you choose).
-- **Optional invitation-only sign-in** (Google or GitHub) with progress synced to the cloud.
+- **Optional sign-in** (Google or GitHub) with progress synced to the cloud, or **guest mode** with progress saved in the browser. The C++ judge needs an account.
+- **Optional ntfy notification** to the site owner whenever someone signs in.
 - **KaTeX maths** in every statement, solution and quiz.
 
 ## Screenshots
@@ -126,17 +127,27 @@ The Algorithm page has a language selector (JavaScript or C++20). JavaScript run
 - runs the tests in batches over one request, each with a wall-clock limit, an output cap, and on Linux a memory limit and CPU-time limit;
 - exposes `POST /api/compile`, `POST /api/run`, `POST /api/runmany` and `GET /api/health`, and serves the built app when `STATIC_DIR` is set.
 
-When Supabase is configured, the judge verifies each request's bearer token against the invitation list and applies per-user rate limits (12 compilations and 120 runs per minute, 4 parallel jobs).
+When Supabase is configured, the judge verifies each request's bearer token with Supabase and applies per-user rate limits (12 compilations and 120 runs per minute), at most 4 parallel jobs and a bounded queue (503 when full).
 
 The `docker-compose.yml` locks the container down: read-only filesystem, tmpfs `/tmp`, 1 GB of RAM, 2 CPUs, 256 processes, all Linux capabilities dropped, `no-new-privileges`, and a port bound to `127.0.0.1` only.
 
 ## Accounts, sync and going online
 
-Sign-in is optional and invitation-only: Google or GitHub through Supabase (no passwords to leak), an `allowed_emails` table decides who may enter, and each user's progress and submissions are stored in one row protected by row-level security. The schema is in [`supabase/schema.sql`](supabase/schema.sql).
+Sign-in is optional. When the Supabase variables are set, visitors can sign in with Google or GitHub (no passwords to leak) or **continue as a guest**:
 
-[`DEPLOY.md`](DEPLOY.md) walks through the whole setup: Supabase, the OAuth apps, managing the invitation list, building the container, and free hosting options (Render, Cloud Run, Oracle Always Free), including how to keep the repository private while deploying.
+| | Guest | Signed in |
+|---|---|---|
+| Problems, papers, archive, JavaScript judge | yes | yes |
+| C++ judge | no | yes |
+| Progress | this browser only (`localStorage`) | synced to the cloud, one row per user protected by row-level security |
 
-Copy `.env.example` to `.env` and fill in the four variables. The Supabase *anon* key is public by design; **never** use or commit the `service_role` key.
+Progress made as a guest stays in the browser and is adopted by the first account that signs in there. By default any account with a verified email may enter; an invite-only mode (an `allowed_emails` table) is one SQL statement away. The schema is in [`supabase/schema.sql`](supabase/schema.sql).
+
+If `NTFY_URL` is set, the server pushes `accesso effettuato da <email> tramite <Google/GitHub>` to your [ntfy](https://ntfy.sh) topic when someone signs in. The check happens on the server, using the verified Supabase token.
+
+[`DEPLOY.md`](DEPLOY.md) walks through the whole setup: Supabase, the OAuth apps, open versus invite-only access, notifications, building the container, and free hosting options (Render, Cloud Run, Oracle Always Free), including how to deploy from a private repository.
+
+Copy `.env.example` to `.env` and fill in the variables. The Supabase *anon* key is public by design; **never** use or commit the `service_role` key, and treat `NTFY_URL` as a secret.
 
 ## Project structure
 
@@ -175,11 +186,12 @@ Dockerfile · docker-compose.yml · DEPLOY.md
 
 ## Security notes and known limits
 
-- **Untrusted code runs on the judge host.** Use the invitation list, keep secrets out of the container, and prefer an isolated host (for example Cloud Run) for a wide audience.
+- **Untrusted code runs on the judge host.** Keep secrets out of the container, switch to invite-only mode if you do not trust your visitors, and prefer an isolated host (for example Cloud Run) for a public site. Guests cannot use the C++ judge.
+- **The date comes from the visitor's device clock.** "Today's" challenge is computed in the browser (`dayNumber()` in `src/lib/daily.ts`), so changing the clock shows other days, including future ones. Only the archive hides unreleased items, and nothing here is secret anyway (the content is public).
+- **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions. That is fine for personal motivation but rules out leaderboards without server-side validation.
 - **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle**, so a determined user can read them. This is fine for friends, but they should move behind the server for a public contest.
 - The judge keeps compiled programs in memory between requests, so run **a single instance**.
 - Free hosts may sleep when idle, so the first request after a pause can be slow.
-- Progress is stored per browser until you sign in; the first account that signs in on a browser adopts its legacy progress.
 
 ## Roadmap
 
