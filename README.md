@@ -1,6 +1,11 @@
 # The Daily Rigor
 
 **A daily exercise in mathematics, algorithms and scholarship.**
+
+### 🔗 Live site: **[the-daily-rigor.onrender.com](https://the-daily-rigor.onrender.com)**
+
+*(It runs on a free host that sleeps when idle, so the first visit after a pause can take up to a minute to load.)*
+
 Every day brings three short challenges for the scientifically minded: a puzzle that rewards insight over computation, a competitive-programming task judged against hidden tests (JavaScript or **C++20**), and a landmark paper with a comprehension quiz.
 
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
@@ -15,13 +20,9 @@ Every day brings three short challenges for the scientifically minded: a puzzle 
 
 - [The three challenges](#the-three-challenges)
 - [Screenshots](#screenshots)
-- [Quick start](#quick-start)
-- [How the daily schedule works](#how-the-daily-schedule-works)
-- [Adding content](#adding-content)
-- [The C++ judge](#the-c-judge)
-- [Accounts, sync and going online](#accounts-sync-and-going-online)
+- [How it works](#how-it-works)
 - [Project structure](#project-structure)
-- [Testing the content](#testing-the-content)
+- [Quality checks](#quality-checks)
 - [Security notes and known limits](#security-notes-and-known-limits)
 - [Roadmap](#roadmap)
 
@@ -43,8 +44,7 @@ The library holds **28 items per section** (28 puzzles, 28 algorithm problems, 2
 - **Submission history**: every submission, accepted or not, is saved with its code, language, verdict and time, and can be loaded back into the editor.
 - **Archive** of past editions with category filters. Only challenges that have already been released are listed, so tomorrow's problem stays hidden.
 - **Light and dark themes** with a toggle (follows the system until you choose).
-- **Optional sign-in** (Google or GitHub) with progress synced to the cloud, or **guest mode** with progress saved in the browser. The C++ judge needs an account.
-- **Optional ntfy notification** to the site owner whenever someone signs in.
+- **Sign-in with Google or GitHub** (no passwords) with progress synced to the cloud, or **guest mode** with progress saved in the browser. The C++ judge needs an account.
 - **KaTeX maths** in every statement, solution and quiz.
 
 ## Screenshots
@@ -76,66 +76,24 @@ Past editions, per-section streaks, and the full released library, browsable by 
 |---|---|
 | ![Home page, dark theme](docs/screenshots/home-dark.png) | ![Algorithm page, dark theme](docs/screenshots/algorithm-dark.png) |
 
-## Quick start
+## How it works
 
-You need Node.js 22 or newer. For C++ judging you also need `g++` (or Docker).
+### The daily schedule
+The days are numbered from **26 October 2026**. Day *d* shows the *d*-th item of each pool, so nothing repeats until a pool is exhausted. A themed week (the seven reinforcement-learning challenges of 31 October – 6 November) was slotted into the pools without deleting anything: the regular programme resumed exactly where it had left off, only shifted by seven days. The archive follows the same order, so future items are never exposed.
 
-```bash
-npm install
-npm run dev            # development server on http://localhost:5173
-npm run judge          # C++ judge on :8787 (needs g++); run it next to `npm run dev`
-```
+**The server decides what day it is.** The app asks the server for the time at start-up, then counts with the browser's monotonic timer, which does not move when the system clock is changed. The server also announces the time zone in which the day changes (Europe/Rome), so every visitor switches to the next edition at the same instant. If the server cannot be reached, the app falls back to the device's clock.
 
-Everything in a single container (the app and the C++ judge) on <http://localhost:8787>:
+### The C++ judge
+JavaScript solutions run in a Web Worker. C++ solutions are sent to a small dependency-free Node server that:
 
-```bash
-npm run docker         # docker compose up --build
-```
-
-Other scripts:
-
-```bash
-npm run build          # production build into dist/ (serve from any static host)
-npm run build:single   # one self-contained HTML file in dist-single/index.html
-npm run test:content   # verify reference solutions, samples, puzzle answers and KaTeX
-npm run lint
-```
-
-Without Supabase variables the app runs fully locally with no sign-in, and progress lives in `localStorage`.
-
-## How the daily schedule works
-
-`src/lib/daily.ts` numbers the days from **26 October 2026** (day 0). Day *d* shows the *d*-th item of each pool, so nothing repeats until a pool is exhausted, after which it cycles.
-
-**Who decides what day it is?** The server. The app asks `GET /api/time` once at start-up (and every ten minutes, and when the tab becomes visible again), then counts with the browser's monotonic timer, which does not move when the system clock is changed. The server also announces the time zone in which the day changes (`DAY_TZ`, default `Europe/Rome`), so every visitor switches to the next edition at the same instant. If the server cannot be reached, the app falls back to the device's clock, frozen at page load. See `src/lib/clock.ts`.
-
-`src/content/schedule.ts` shows how a themed week is slotted in without deleting anything: the seven reinforcement-learning items (`rl-math.ts`, `rl-code.ts`, `rl-papers.ts`) are inserted after the first five days, and the regular programme resumes exactly where it left off, only shifted by seven days. Archive visibility follows the same order, so future items are never exposed.
-
-## Adding content
-
-All content lives in `src/content/` as typed TypeScript objects (types in `src/types.ts`).
-
-- **Puzzle**: add a `MathPuzzle` to `math.ts`. Use `tolerance: 0` for exact integers or a relative tolerance for real values.
-- **Algorithm problem**: add a `CodingProblem` to `code.ts` with a `reference` solution, a seeded `generateTests()` (include maximal inputs), and an optional `check` when many outputs are valid. Add a brute-force cross-check to `scripts/verify-content.ts`.
-- **Paper**: add a `Paper` to `papers.ts` with `topics`, a summary, key ideas, a reading guide and quiz questions. Options are shuffled deterministically when displayed.
-
-Text fields support paragraphs (blank line), `- ` bullet lists, `` `code` ``, `**bold**`, `*italic*`, and `$inline$` / `$$display$$` LaTeX. (Plain-text fields such as `keyIdeas` do not render LaTeX.)
-
-## The C++ judge
-
-The Algorithm page has a language selector (JavaScript or C++20). JavaScript runs in a Web Worker. C++ is sent to `server/judge-server.mjs`, a small dependency-free Node server that:
-
-- compiles with `g++ -O2 -std=c++20` (the Docker image ships a **precompiled `<bits/stdc++.h>`**, so a typical compile takes about a tenth of a second);
+- compiles with `g++ -O2 -std=c++20`, with a **precompiled `<bits/stdc++.h>`** so a typical compile takes about a tenth of a second;
 - runs the tests in batches over one request, each with a wall-clock limit, an output cap, and on Linux a memory limit and CPU-time limit;
-- exposes `POST /api/compile`, `POST /api/run`, `POST /api/runmany`, `POST /api/hello` (sign-in notification), `GET /api/time` and `GET /api/health`, and serves the built app when `STATIC_DIR` is set.
+- verifies the user's token with Supabase and applies per-user rate limits, at most 4 parallel jobs and a bounded waiting queue.
 
-When Supabase is configured, the judge verifies each request's bearer token with Supabase and applies per-user rate limits (12 compilations and 120 runs per minute), at most 4 parallel jobs and a bounded queue (503 when full).
+The whole site, the app and the judge, is **one Docker image** running in a hardened container: read-only filesystem, all Linux capabilities dropped, `no-new-privileges`, and memory, CPU and process limits.
 
-The `docker-compose.yml` locks the container down: read-only filesystem, tmpfs `/tmp`, 1 GB of RAM, 2 CPUs, 256 processes, all Linux capabilities dropped, `no-new-privileges`, and a port bound to `127.0.0.1` only.
-
-## Accounts, sync and going online
-
-Sign-in is optional. When the Supabase variables are set, visitors can sign in with Google or GitHub (no passwords to leak) or **continue as a guest**:
+### Accounts and sync
+Visitors sign in with Google or GitHub through Supabase, or **continue as a guest**:
 
 | | Guest | Signed in |
 |---|---|---|
@@ -143,13 +101,7 @@ Sign-in is optional. When the Supabase variables are set, visitors can sign in w
 | C++ judge | no | yes |
 | Progress | this browser only (`localStorage`) | synced to the cloud, one row per user protected by row-level security |
 
-Signing in starts from a clean slate: progress saved as a guest is discarded, never uploaded (the sign-in page says so). By default any account with a verified email may enter; an invite-only mode (an `allowed_emails` table) is one SQL statement away. The schema is in [`supabase/schema.sql`](supabase/schema.sql).
-
-If `NTFY_URL` is set, the server pushes `accesso effettuato da <email> tramite <Google/GitHub>` to your [ntfy](https://ntfy.sh) topic when someone signs in. The check happens on the server, using the verified Supabase token.
-
-[`DEPLOY.md`](DEPLOY.md) walks through the whole setup: Supabase, the OAuth apps, open versus invite-only access, notifications, building the container, and free hosting options (Render, Cloud Run, Oracle Always Free), including how to deploy from a private repository.
-
-Copy `.env.example` to `.env` and fill in the variables. The Supabase *anon* key is public by design; **never** use or commit the `service_role` key, and treat `NTFY_URL` as a secret.
+Signing in starts from a clean slate: progress saved as a guest is discarded, never uploaded.
 
 ## Project structure
 
@@ -160,11 +112,12 @@ src/
                  schedule.ts                          slots a themed week into the pools
   lib/
     daily.ts     day numbering, daily rotation, "released" check for the archive
+    clock.ts     server-decided time, immune to changes of the device clock
     progress.ts  progress store (localStorage), streaks, cross-tab sync
     submissions.ts  saved submissions with their code
     judge.ts     Web Worker sandbox, C++ client, verdicts, custom checkers
     highlight.ts dependency-free tokenizer for JavaScript and C++
-    auth.ts      Supabase sign-in (PKCE) and invitation check
+    auth.ts      Supabase sign-in (PKCE), guest mode
     cloud.ts     merge and sync of progress with the user's cloud row
     theme.ts     light/dark toggle
     answer.ts    numeric and fraction answer parsing with tolerance
@@ -172,14 +125,14 @@ src/
   pages/         Home · MathPage · CodePage · PaperPage · Archive · Login
   components/    CodeEditor · Rich (light markup + KaTeX) · shared UI
 server/          judge-server.mjs                     C++ compile/run + static hosting
-supabase/        schema.sql                           tables, RLS policies, am_i_allowed()
+supabase/        schema.sql                           tables, row-level security policies
 scripts/         verify-content.ts                    content verification
-Dockerfile · docker-compose.yml · DEPLOY.md
+Dockerfile · docker-compose.yml
 ```
 
-## Testing the content
+## Quality checks
 
-`npm run test:content` checks that:
+A verification script (`scripts/verify-content.ts`) checks that:
 
 - every reference solution reproduces the sample outputs, and agrees with an **independent brute-force implementation** on thousands of small random inputs;
 - the hidden tests generate quickly, and every checker accepts its own reference;
@@ -188,12 +141,11 @@ Dockerfile · docker-compose.yml · DEPLOY.md
 
 ## Security notes and known limits
 
-- **Untrusted code runs on the judge host.** Keep secrets out of the container, switch to invite-only mode if you do not trust your visitors, and prefer an isolated host (for example Cloud Run) for a public site. Guests cannot use the C++ judge.
-- **The date comes from the server, but only the date.** Changing the device clock no longer changes "today". It is still only a convenience, though: the whole content ships in the bundle, so someone with the developer tools can open any item directly, and nothing is secret anyway (the repository is public). The server does not record when you solved something, so completion dates are not provable.
+- **Untrusted code runs on the judge host.** It needs a signed-in account, is rate-limited per user and runs in a locked-down container. Guests cannot use the C++ judge.
+- **The date comes from the server, but only the date.** Changing the device clock no longer changes "today". It is still only a convenience, though: the whole content ships in the bundle, so someone with the developer tools can open any item directly, and nothing is secret anyway. The server does not record when you solved something, so completion dates are not provable.
 - **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions (guest progress is at least never carried into an account). That is fine for personal motivation but rules out leaderboards. Making it trustworthy means recording completions on the server, with the server's date, and verifying answers there (puzzle and quiz answers in the database, code judged against tests held by the server).
-- **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle**, so a determined user can read them. This is fine for friends, but they should move behind the server for a public contest.
+- **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle** (and are in this repository), so anyone can read them. That is fine for a self-study site, but they would have to move behind the server for a contest.
 - The judge keeps compiled programs in memory between requests, so run **a single instance**.
-- Free hosts may sleep when idle, so the first request after a pause can be slow.
 
 ## Roadmap
 
