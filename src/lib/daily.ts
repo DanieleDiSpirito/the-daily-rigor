@@ -1,4 +1,5 @@
 import type { SectionId } from '../types';
+import { clockNow, zonedParts } from './clock';
 import { mathPuzzles } from '../content/math';
 import { codingProblems } from '../content/code';
 import { papers } from '../content/papers';
@@ -6,9 +7,10 @@ import { papers } from '../content/papers';
 /** Day 0 of the platform (26 October 2026). Day numbers are counted in the user's local calendar. */
 const EPOCH = Date.UTC(2026, 9, 26);
 
-export function dayNumber(d = new Date()): number {
-  const localMidnightAsUtc = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  return Math.round((localMidnightAsUtc - EPOCH) / 86_400_000);
+/** The day number at time `d` (by default the server's current time), in the time zone the server announced. */
+export function dayNumber(d: Date = clockNow()): number {
+  const { year, month, day } = zonedParts(d);
+  return Math.round((Date.UTC(year, month - 1, day) - EPOCH) / 86_400_000);
 }
 
 export function dateOfDay(day: number): Date {
@@ -44,9 +46,9 @@ export function dailyId(section: SectionId, day: number): string {
   return pools[section][dailyIndex(section, day)].id;
 }
 
-export function msUntilTomorrow(now = new Date()): number {
-  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return t.getTime() - now.getTime();
+export function msUntilTomorrow(now: Date = clockNow()): number {
+  const { hour, minute, second } = zonedParts(now);
+  return 86_400_000 - (((hour * 60 + minute) * 60 + second) * 1000 + (now.getTime() % 1000));
 }
 
 export const SECTION_META: Record<SectionId, { label: string; numeral: string; blurb: string }> = {

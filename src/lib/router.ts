@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { clockNow } from './clock';
 
 /** Minimal hash router; swap for react-router once server-side routes exist. */
 export function useRoute(): string[] {
@@ -19,9 +20,9 @@ export const href = (...parts: string[]) => '#/' + parts.join('/');
 
 /** Re-renders periodically so that the date rolls over at midnight. */
 export function useNow(intervalMs = 30_000): Date {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState(() => clockNow());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), intervalMs);
+    const t = setInterval(() => setNow(clockNow()), intervalMs);
     return () => clearInterval(t);
   }, [intervalMs]);
   return now;

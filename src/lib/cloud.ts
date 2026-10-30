@@ -47,11 +47,10 @@ export async function attachCloud(client: SupabaseClient, uid: string) {
   if (remote.data) {
     progress = mergeProgress(progress, remote.data.progress as ProgressState);
     subs = mergeSubmissions(subs, remote.data.submissions as Submission[]);
-  } else if (!Object.keys(progress).length && !subs.length) {
-    // First sign-in on this browser: adopt anything that was stored before accounts existed.
-    progress = read<ProgressState>(LEGACY.progress, {});
-    subs = read<Submission[]>(LEGACY.submissions, []);
   }
+  // Progress saved in this browser before signing in (as a guest) is deliberately discarded, never uploaded:
+  // it could have been edited by hand, and signing in starts from a clean slate. The sign-in page says so.
+  try { localStorage.removeItem(LEGACY.progress); localStorage.removeItem(LEGACY.submissions); } catch { /* ignore */ }
   write(pKey, progress);
   write(sKey, subs);
 

@@ -1,6 +1,7 @@
 import type { CodingProblem } from '../types';
 import { tokens } from './rng';
 import { accessToken } from './auth';
+import { JUDGE_URL } from './endpoint';
 
 /**
  * In-browser judge. User code runs in a dedicated Web Worker so that infinite
@@ -10,10 +11,6 @@ import { accessToken } from './auth';
 
 export type Verdict = 'AC' | 'WA' | 'TLE' | 'RE' | 'CE';
 export type Language = 'js' | 'cpp';
-
-/** Base URL of the C++ judge server (`npm run judge`). In dev, Vite proxies /api to it. */
-const JUDGE_URL: string =
-  import.meta.env?.VITE_JUDGE_URL ?? (typeof location !== 'undefined' && location.protocol === 'file:' ? 'http://localhost:8787' : '');
 
 export interface TestResult {
   index: number;

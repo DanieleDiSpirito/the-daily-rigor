@@ -25,6 +25,8 @@ const AUTH = !!(SUPABASE_URL && SUPABASE_KEY);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN; // e.g. https://rigor.example.com; unset = same-origin only when AUTH is on
 const MEMORY_KB = Number(process.env.MEMORY_LIMIT_KB ?? 512 * 1024);
 const MAX_PARALLEL = Number(process.env.MAX_PARALLEL ?? 4);
+let DAY_TZ = process.env.DAY_TZ || 'Europe/Rome'; // the time zone in which the daily challenge changes, for everyone
+try { new Intl.DateTimeFormat('en', { timeZone: DAY_TZ }); } catch { console.error(`Unknown DAY_TZ "${DAY_TZ}", using UTC.`); DAY_TZ = 'UTC'; }
 const MAX_QUEUE = Number(process.env.MAX_QUEUE ?? 50); // jobs allowed to wait for a free slot; beyond that, answer 503
 const NTFY_URL = process.env.NTFY_URL; // optional, e.g. https://ntfy.sh/<long-random-topic>: notified when someone signs in
 const NTFY_TOKEN = process.env.NTFY_TOKEN; // optional access token for a protected ntfy topic
@@ -217,12 +219,14 @@ createServer(async (req, res) => {
     res.writeHead(status, {
       'content-type': 'application/json',
       ...(origin ? { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'content-type, authorization' } : {}),
+      'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
     });
     res.end(JSON.stringify(body));
   };
   if (req.method === 'OPTIONS') return send(204, {});
   try {
+    if (req.method === 'GET' && req.url?.split('?')[0] === '/api/time') return send(200, { now: Date.now(), tz: DAY_TZ });
     if (req.method === 'GET' && req.url === '/api/health') return send(200, { ok: true, compiler: CXX });
     let uid = 'local';
     if (AUTH && req.method === 'POST' && req.url?.startsWith('/api/')) {

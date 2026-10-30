@@ -105,7 +105,9 @@ Without Supabase variables the app runs fully locally with no sign-in, and progr
 
 ## How the daily schedule works
 
-`src/lib/daily.ts` numbers the days from **26 October 2026** (day 0, in the visitor's local calendar). Day *d* shows the *d*-th item of each pool, so nothing repeats until a pool is exhausted, after which it cycles.
+`src/lib/daily.ts` numbers the days from **26 October 2026** (day 0). Day *d* shows the *d*-th item of each pool, so nothing repeats until a pool is exhausted, after which it cycles.
+
+**Who decides what day it is?** The server. The app asks `GET /api/time` once at start-up (and every ten minutes, and when the tab becomes visible again), then counts with the browser's monotonic timer, which does not move when the system clock is changed. The server also announces the time zone in which the day changes (`DAY_TZ`, default `Europe/Rome`), so every visitor switches to the next edition at the same instant. If the server cannot be reached, the app falls back to the device's clock, frozen at page load. See `src/lib/clock.ts`.
 
 `src/content/schedule.ts` shows how a themed week is slotted in without deleting anything: the seven reinforcement-learning items (`rl-math.ts`, `rl-code.ts`, `rl-papers.ts`) are inserted after the first five days, and the regular programme resumes exactly where it left off, only shifted by seven days. Archive visibility follows the same order, so future items are never exposed.
 
@@ -125,7 +127,7 @@ The Algorithm page has a language selector (JavaScript or C++20). JavaScript run
 
 - compiles with `g++ -O2 -std=c++20` (the Docker image ships a **precompiled `<bits/stdc++.h>`**, so a typical compile takes about a tenth of a second);
 - runs the tests in batches over one request, each with a wall-clock limit, an output cap, and on Linux a memory limit and CPU-time limit;
-- exposes `POST /api/compile`, `POST /api/run`, `POST /api/runmany` and `GET /api/health`, and serves the built app when `STATIC_DIR` is set.
+- exposes `POST /api/compile`, `POST /api/run`, `POST /api/runmany`, `POST /api/hello` (sign-in notification), `GET /api/time` and `GET /api/health`, and serves the built app when `STATIC_DIR` is set.
 
 When Supabase is configured, the judge verifies each request's bearer token with Supabase and applies per-user rate limits (12 compilations and 120 runs per minute), at most 4 parallel jobs and a bounded queue (503 when full).
 
@@ -141,7 +143,7 @@ Sign-in is optional. When the Supabase variables are set, visitors can sign in w
 | C++ judge | no | yes |
 | Progress | this browser only (`localStorage`) | synced to the cloud, one row per user protected by row-level security |
 
-Progress made as a guest stays in the browser and is adopted by the first account that signs in there. By default any account with a verified email may enter; an invite-only mode (an `allowed_emails` table) is one SQL statement away. The schema is in [`supabase/schema.sql`](supabase/schema.sql).
+Signing in starts from a clean slate: progress saved as a guest is discarded, never uploaded (the sign-in page says so). By default any account with a verified email may enter; an invite-only mode (an `allowed_emails` table) is one SQL statement away. The schema is in [`supabase/schema.sql`](supabase/schema.sql).
 
 If `NTFY_URL` is set, the server pushes `accesso effettuato da <email> tramite <Google/GitHub>` to your [ntfy](https://ntfy.sh) topic when someone signs in. The check happens on the server, using the verified Supabase token.
 
@@ -187,8 +189,8 @@ Dockerfile · docker-compose.yml · DEPLOY.md
 ## Security notes and known limits
 
 - **Untrusted code runs on the judge host.** Keep secrets out of the container, switch to invite-only mode if you do not trust your visitors, and prefer an isolated host (for example Cloud Run) for a public site. Guests cannot use the C++ judge.
-- **The date comes from the visitor's device clock.** "Today's" challenge is computed in the browser (`dayNumber()` in `src/lib/daily.ts`), so changing the clock shows other days, including future ones. Only the archive hides unreleased items, and nothing here is secret anyway (the content is public).
-- **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions. That is fine for personal motivation but rules out leaderboards without server-side validation.
+- **The date comes from the server, but only the date.** Changing the device clock no longer changes "today". It is still only a convenience, though: the whole content ships in the bundle, so someone with the developer tools can open any item directly, and nothing is secret anyway (the repository is public). The server does not record when you solved something, so completion dates are not provable.
+- **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions (guest progress is at least never carried into an account). That is fine for personal motivation but rules out leaderboards. Making it trustworthy means recording completions on the server, with the server's date, and verifying answers there (puzzle and quiz answers in the database, code judged against tests held by the server).
 - **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle**, so a determined user can read them. This is fine for friends, but they should move behind the server for a public contest.
 - The judge keeps compiled programs in memory between requests, so run **a single instance**.
 - Free hosts may sleep when idle, so the first request after a pause can be slow.

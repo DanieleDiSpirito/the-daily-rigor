@@ -29,6 +29,7 @@ export function Login({ state }: { state: AuthState }) {
               <button className="btn" onClick={() => signIn('github')}>Continue with GitHub</button>
             </div>
             <p className="hint-text">We only receive your name and email address, to recognise you and to keep your progress and streaks. The site owner may be notified when someone signs in.</p>
+            <p className="feedback bad">Signing in starts from a clean slate: any progress saved in this browser as a guest is discarded, and from then on your progress is kept in your account.</p>
             <hr />
             <p>
               Just looking around? You can <button className="linklike" onClick={continueAsGuest}>continue as a guest</button>. Everything works except the C++ judge,
