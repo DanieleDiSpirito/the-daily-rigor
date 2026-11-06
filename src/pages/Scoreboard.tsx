@@ -158,7 +158,7 @@ function Board({ today, uid }: { today: number; uid: string }) {
           well you did in its quiz. Each total is then divided by the most it could ever be, over the whole library, and scaled to 1000. The overall score is the mean of the three, so every feature weighs exactly a third.
         </p>
         <p className="hint-text">
-          The streak is counted on daily challenges completed on their own day, and a streak ends when a day is missed. The numbers are reported by each player&rsquo;s browser and are not verified, so treat the board as friendly rather than official.
+          The streak is counted on daily challenges completed on their own day, and a streak ends when a day is missed. The database works everything out from the progress each player has saved, and that progress is not verified, so treat the board as friendly rather than official.
         </p>
       </section>
     </>
@@ -212,7 +212,7 @@ function Profile({ uid, onChange }: { uid: string; onChange: () => void }) {
       </form>
       {msg && <p className={`feedback ${msg.tone}`}>{msg.text}</p>}
       <p className="hint-text">
-        Other players see only this nickname, never your name or email. Until you choose one you appear as an anonymous &ldquo;Player&rdquo; with four letters or digits. Leave the field empty to go back to that.
+        Everyone who has signed in is listed automatically. Other players see only this nickname, never your name or email; until you choose one you appear as an anonymous &ldquo;Player&rdquo; with four letters or digits (leave the field empty to go back to that). Untick the box to disappear from the board.
       </p>
     </section>
   );

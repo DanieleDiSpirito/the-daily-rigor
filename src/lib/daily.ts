@@ -5,7 +5,7 @@ import { codingProblems } from '../content/code';
 import { papers } from '../content/papers';
 
 /** Day 0 of the platform (26 October 2026). Day numbers are counted in the user's local calendar. */
-const EPOCH = Date.UTC(2026, 9, 26);
+export const EPOCH = Date.UTC(2026, 9, 26);
 
 /** The day number at time `d` (by default the server's current time), in the time zone the server announced. */
 export function dayNumber(d: Date = clockNow()): number {

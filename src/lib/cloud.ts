@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { setProgressStore, type ProgressState } from './progress';
 import { setSubmissionStore, type Submission } from './submissions';
-import { computeStats } from './scoring';
 
 /**
  * Per-user storage: the browser keeps a cache (so the UI stays synchronous and works offline),
@@ -70,11 +69,9 @@ export async function attachCloud(client: SupabaseClient, uid: string) {
       const s = mergeSubmissions(read<Submission[]>(sKey, []), (cur.data?.submissions as Submission[]) ?? []);
       write(pKey, p);
       write(sKey, s);
-      // `stats` feeds the scoreboard; the nickname and visibility are written elsewhere and left untouched here.
-      const row = { user_id: uid, progress: p, submissions: s, updated_at: new Date().toISOString() };
-      const res = await client.from('user_data').upsert({ ...row, stats: computeStats(p) });
-      // Before the database has been updated with the scoreboard columns, keep saving the progress without them.
-      if (res.error && (res.error.code === 'PGRST204' || /\bstats\b/.test(res.error.message))) await client.from('user_data').upsert(row);
+      // Only the progress is uploaded: the database computes the scoreboard from it. The nickname and the
+      // visibility are written elsewhere and left untouched here.
+      await client.from('user_data').upsert({ user_id: uid, progress: p, submissions: s, updated_at: new Date().toISOString() });
     }).catch(() => {});
     return inflight;
   };

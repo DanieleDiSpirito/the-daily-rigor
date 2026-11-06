@@ -14,6 +14,10 @@ import { completedOnDay, everSolved, type ProgressState } from './progress';
  * mean of the three, which makes every feature weigh exactly one third no matter how many items it has or
  * how large its natural unit is. Since the maxima come from the whole library, scores shrink slightly when
  * new items are added.
+ *
+ * The scoreboard itself is computed by the database (`compute_stats` in supabase/schema.sql, which reads the
+ * library from supabase/catalog.sql) so that it covers everybody, even players who have not come back. This
+ * TypeScript version is the reference: scripts/verify-sql.ts checks that both give the same numbers.
  */
 export const DIFFICULTY_WEIGHT: Record<Difficulty, number> = { Introductory: 1, Intermediate: 2, Advanced: 4 };
 

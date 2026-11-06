@@ -6,6 +6,8 @@ import { papers } from '../src/content/papers';
 import { tokens, rng } from '../src/lib/rng';
 import { renderRich } from '../src/components/Rich';
 import { computeStats, currentStreak, DIFFICULTY_WEIGHT } from '../src/lib/scoring';
+import { readFileSync } from 'node:fs';
+import { buildCatalogSql } from './catalog-sql';
 import { dailyId } from '../src/lib/daily';
 import type { ProgressState } from '../src/lib/progress';
 import type { SectionId } from '../src/types';
@@ -262,6 +264,9 @@ for (const p of mathPuzzles) {
   if (currentStreak(s5, 6) !== 2 || currentStreak(s5, 7) !== 0) fail('scoring: a run ends when two days are missed');
   if (computeStats(days, 7).math.best !== 3) fail('scoring: longest streak');
 }
+
+// The library as the database knows it (supabase/catalog.sql) must match the content.
+if (readFileSync(new URL('../supabase/catalog.sql', import.meta.url), 'utf8') !== buildCatalogSql()) fail('supabase/catalog.sql is out of date: run `npm run gen:catalog`');
 
 // Ids must be unique across the three sections too (progress is keyed by id).
 { const ids = [...mathPuzzles, ...codingProblems, ...papers].map((x) => x.id); const dup = ids.filter((x, i) => ids.indexOf(x) !== i); if (dup.length) fail(`duplicate ids: ${dup}`); }

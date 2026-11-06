@@ -101,7 +101,7 @@ The whole site, the app and the judge, is **one Docker image** running in a hard
 ### The scoreboard
 Each feature is measured in its own unit: for **Problems**, the puzzles solved weighted by difficulty (Introductory 1, Intermediate 2, Advanced 4); for **Algorithms**, the sum of the Codeforces ratings of the problems solved; for **Papers**, the reading minutes of every paper completed multiplied by the quiz correctness. Each total is divided by the most it could ever be over the whole library and scaled to 1000, and the overall score is the mean of the three, so every feature weighs exactly a third whatever its natural unit. Streaks count daily challenges completed on their own day; a run that ended before yesterday shows as 0, and the longest run ever is kept alongside.
 
-Players appear under a nickname of their choice (an anonymous "Player" with four hex digits until then), never with a name or email, and can hide from the board. The board is read through a database function, since each player can only read their own row.
+The scoreboard is computed **by the database**, from the progress each player has saved and a copy of the library (generated from the app's content), with the same formula as the app: that way it covers everybody who has ever signed in, even players who have not come back, and a test checks that the SQL and TypeScript versions agree on hundreds of random progress states. Everyone is listed automatically under a nickname of their choice (an anonymous "Player" with four hex digits until then), never with a name or email, and can hide from the board. It is read through a database function, since each player can only read their own row.
 
 ### Accounts and sync
 Visitors sign in with Google or GitHub through Supabase, or **continue as a guest**:
@@ -126,7 +126,7 @@ src/
     clock.ts     server-decided time, immune to changes of the device clock
     progress.ts  progress store (localStorage), streaks, cross-tab sync
     submissions.ts  saved submissions with their code
-    scoring.ts   the scoreboard formula, streaks and per-category counts
+    scoring.ts   the scoreboard formula (reference version of the SQL one), streaks, category counts
     judge.ts     Web Worker sandbox, C++ client, verdicts, custom checkers
     highlight.ts dependency-free tokenizer for JavaScript and C++
     auth.ts      Supabase sign-in (PKCE), guest mode
@@ -137,7 +137,7 @@ src/
   pages/         Home · MathPage · CodePage · PaperPage · Archive · Scoreboard · Login
   components/    CodeEditor · Rich (light markup + KaTeX) · shared UI
 server/          judge-server.mjs                     C++ compile/run + static hosting
-supabase/        schema.sql                           tables, row-level security policies
+supabase/        schema.sql · catalog.sql             tables, row-level security, scoreboard; library for the database
 scripts/         verify-content.ts                    content verification
 Dockerfile · docker-compose.yml
 ```
@@ -149,13 +149,16 @@ A verification script (`scripts/verify-content.ts`) checks that:
 - every reference solution reproduces the sample outputs, and agrees with an **independent brute-force implementation** on thousands of small random inputs;
 - the hidden tests generate quickly, and every checker accepts its own reference;
 - every puzzle answer is recomputed independently (exact enumeration or Monte Carlo);
-- all quiz answers are in range, ids are unique across sections, and every piece of LaTeX renders.
+- all quiz answers are in range, ids are unique across sections, and every piece of LaTeX renders;
+- the copy of the library used by the database is up to date.
+
+A second script runs the database schema on a real Postgres (in-process) and checks that the scoreboard computed there matches the TypeScript formula on 300 random progress states, that the access rules hold (nobody reads other players' rows, emails or ids), and that corrupt progress cannot take the board down.
 
 ## Security notes and known limits
 
 - **Untrusted code runs on the judge host.** It needs a signed-in account, is rate-limited per user and runs in a locked-down container. Guests cannot use the C++ judge.
 - **The date comes from the server, but only the date.** Changing the device clock no longer changes "today". It is still only a convenience, though: the whole content ships in the bundle, so someone with the developer tools can open any item directly, and nothing is secret anyway. The server does not record when you solved something, so completion dates are not provable.
-- **Scoreboard numbers are not verified.** Each player's browser computes and uploads its own stats, and the database only rejects absurd values (scores out of range, streaks longer than the site has existed), so a determined player could still invent plausible ones. Treat the board as friendly rather than official.
+- **Scoreboard numbers are not verified.** The database computes them, but from the progress each player has written, so they cannot exceed the maximum and need real item ids, yet a determined player could still invent a plausible progress. Treat the board as friendly rather than official.
 - **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions (guest progress is at least never carried into an account). That is fine for personal motivation but rules out leaderboards. Making it trustworthy means recording completions on the server, with the server's date, and verifying answers there (puzzle and quiz answers in the database, code judged against tests held by the server).
 - **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle** (and are in this repository), so anyone can read them. That is fine for a self-study site, but they would have to move behind the server for a contest.
 - The judge keeps compiled programs in memory between requests, so run **a single instance**.
