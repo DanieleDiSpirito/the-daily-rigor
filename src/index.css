@@ -326,3 +326,31 @@ pre { background: var(--code-bg); padding: 10px 12px; border-radius: 4px; margin
 
 .theme-toggle { background: none; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink-2); font: inherit; font-family: var(--sans); font-size: 13px; padding: 1px 10px; cursor: pointer; }
 .theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+
+/* Scoreboard */
+.board-wrap { overflow-x: auto; margin: 0 -8px; padding: 0 8px; }
+.board { min-width: 980px; font-size: 15px; }
+.board th, .board td { white-space: nowrap; }
+.board th.num, .board td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.board thead tr.group th { text-align: center; border-bottom: 1px solid var(--rule); color: var(--accent); }
+.board thead th { vertical-align: bottom; }
+.board th.edge, .board td.edge { border-left: 1px solid var(--rule); }
+.board th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: baseline; }
+.board th button:hover, .board th button:focus-visible { color: var(--ink); }
+.board th button.on { color: var(--accent); }
+.board tbody tr.player { cursor: pointer; }
+.board tbody tr.player:hover td { background: var(--code-bg); }
+.board tbody tr.me td { background: var(--accent-soft); }
+.board td.rank { color: var(--ink-3); font-family: var(--sans); width: 3em; }
+.board td.name { font-weight: 600; max-width: 18em; overflow: hidden; text-overflow: ellipsis; }
+.board td.name .you { font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--accent); margin-left: 6px; }
+.board td.total { font-weight: 700; font-size: 17px; }
+.board tr.detail td { white-space: normal; background: var(--paper); }
+.board .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 28px; }
+.board .cat-grid h4 { margin: 0 0 6px; font-family: var(--sans); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.board .cat-grid p { margin: 0; font-family: var(--sans); font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+.board .cat-grid b { color: var(--ink); }
+.profile-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.profile-form input[type='text'] { font: inherit; font-family: var(--sans); font-size: 15px; padding: 7px 10px; border: 1px solid var(--ink-3); border-radius: 4px; background: var(--paper); color: var(--ink); width: 14em; }
+.profile-form label { font-family: var(--sans); font-size: 14px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+@media (max-width: 760px) { .board .cat-grid { grid-template-columns: 1fr; } }

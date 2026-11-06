@@ -42,6 +42,7 @@ The library holds **28 items per section** (28 puzzles, 28 algorithm problems, 2
 - **A real code editor**: syntax highlighting for JavaScript and C++, line numbers, auto-indent, auto-closing brackets and quotes with skip-over, smart backspace, block expansion between braces, multi-line <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd>, comment toggling with <kbd>Ctrl/⌘</kbd>+<kbd>/</kbd>, submit with <kbd>Ctrl/⌘</kbd>+<kbd>Enter</kbd>, and compiler errors highlighted on the offending line.
 - **A judge report that helps you debug**: every test is run even after a failure, the failing tests are listed, and for each one you see the input, your output and the expected output (with copy buttons).
 - **Submission history**: every submission, accepted or not, is saved with its code, language, verdict and time, and can be loaded back into the editor.
+- **A scoreboard** of all signed-in players, sortable by every column: an overall score, solved counts, current and longest streaks for each of the three features, and what each player has solved per category.
 - **Archive** of past editions with category filters. Only challenges that have already been released are listed, so tomorrow's problem stays hidden.
 - **Light and dark themes** with a toggle (follows the system until you choose).
 - **Sign-in with Google or GitHub** (no passwords) with progress synced to the cloud, or **guest mode** with progress saved in the browser. The C++ judge needs an account.
@@ -70,6 +71,11 @@ Past editions, per-section streaks, and the full released library, browsable by 
 
 ![Archive page with category filters](docs/screenshots/archive.png)
 
+### Scoreboard
+Every column can be sorted; clicking a player shows what they have solved in each category. (The players in this screenshot are sample data.)
+
+![Scoreboard with sortable columns](docs/screenshots/scoreboard.png)
+
 ### Dark theme
 
 | Home | Algorithm |
@@ -91,6 +97,11 @@ JavaScript solutions run in a Web Worker. C++ solutions are sent to a small depe
 - verifies the user's token with Supabase and applies per-user rate limits, at most 4 parallel jobs and a bounded waiting queue.
 
 The whole site, the app and the judge, is **one Docker image** running in a hardened container: read-only filesystem, all Linux capabilities dropped, `no-new-privileges`, and memory, CPU and process limits.
+
+### The scoreboard
+Each feature is measured in its own unit: for **Problems**, the puzzles solved weighted by difficulty (Introductory 1, Intermediate 2, Advanced 4); for **Algorithms**, the sum of the Codeforces ratings of the problems solved; for **Papers**, the reading minutes of every paper completed multiplied by the quiz correctness. Each total is divided by the most it could ever be over the whole library and scaled to 1000, and the overall score is the mean of the three, so every feature weighs exactly a third whatever its natural unit. Streaks count daily challenges completed on their own day; a run that ended before yesterday shows as 0, and the longest run ever is kept alongside.
+
+Players appear under a nickname of their choice (an anonymous "Player" with four hex digits until then), never with a name or email, and can hide from the board. The board is read through a database function, since each player can only read their own row.
 
 ### Accounts and sync
 Visitors sign in with Google or GitHub through Supabase, or **continue as a guest**:
@@ -115,6 +126,7 @@ src/
     clock.ts     server-decided time, immune to changes of the device clock
     progress.ts  progress store (localStorage), streaks, cross-tab sync
     submissions.ts  saved submissions with their code
+    scoring.ts   the scoreboard formula, streaks and per-category counts
     judge.ts     Web Worker sandbox, C++ client, verdicts, custom checkers
     highlight.ts dependency-free tokenizer for JavaScript and C++
     auth.ts      Supabase sign-in (PKCE), guest mode
@@ -122,7 +134,7 @@ src/
     theme.ts     light/dark toggle
     answer.ts    numeric and fraction answer parsing with tolerance
     rng.ts       seeded PRNG for reproducible hidden tests
-  pages/         Home · MathPage · CodePage · PaperPage · Archive · Login
+  pages/         Home · MathPage · CodePage · PaperPage · Archive · Scoreboard · Login
   components/    CodeEditor · Rich (light markup + KaTeX) · shared UI
 server/          judge-server.mjs                     C++ compile/run + static hosting
 supabase/        schema.sql                           tables, row-level security policies
@@ -143,6 +155,7 @@ A verification script (`scripts/verify-content.ts`) checks that:
 
 - **Untrusted code runs on the judge host.** It needs a signed-in account, is rate-limited per user and runs in a locked-down container. Guests cannot use the C++ judge.
 - **The date comes from the server, but only the date.** Changing the device clock no longer changes "today". It is still only a convenience, though: the whole content ships in the bundle, so someone with the developer tools can open any item directly, and nothing is secret anyway. The server does not record when you solved something, so completion dates are not provable.
+- **Scoreboard numbers are not verified.** Each player's browser computes and uploads its own stats, and the database only rejects absurd values (scores out of range, streaks longer than the site has existed), so a determined player could still invent plausible ones. Treat the board as friendly rather than official.
 - **Progress is not tamper-proof.** Guest data is in `localStorage` and cloud data is a row the user can write, so anyone can edit streaks and submissions (guest progress is at least never carried into an account). That is fine for personal motivation but rules out leaderboards. Making it trustworthy means recording completions on the server, with the server's date, and verifying answers there (puzzle and quiz answers in the database, code judged against tests held by the server).
 - **Reference solutions, hidden tests and puzzle answers ship in the JavaScript bundle** (and are in this repository), so anyone can read them. That is fine for a self-study site, but they would have to move behind the server for a contest.
 - The judge keeps compiled programs in memory between requests, so run **a single instance**.

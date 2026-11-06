@@ -7,6 +7,7 @@ import { MathPage } from './pages/MathPage';
 import { CodePage } from './pages/CodePage';
 import { PaperPage } from './pages/PaperPage';
 import { Archive } from './pages/Archive';
+import { Scoreboard } from './pages/Scoreboard';
 import { Login } from './pages/Login';
 import { authEnabled, leaveGuest, signOut, useAuth } from './lib/auth';
 import { announceSignIn } from './lib/judge';
@@ -18,6 +19,7 @@ const NAV: { to: string; label: string; section?: SectionId }[] = [
   { to: 'code', label: 'II · Algorithm', section: 'code' },
   { to: 'papers', label: 'III · Paper', section: 'papers' },
   { to: 'archive', label: 'Archive' },
+  { to: 'scoreboard', label: 'Scoreboard' },
 ];
 
 function countdown(ms: number) {
@@ -42,10 +44,11 @@ export default function App() {
   else if (head === 'code' && known('code')) page = <CodePage today={today} id={id} />;
   else if (head === 'papers' && known('papers')) page = <PaperPage today={today} id={id} />;
   else if (head === 'archive') page = <Archive today={today} />;
+  else if (head === 'scoreboard') page = <Scoreboard today={today} auth={auth} />;
   else page = <Home today={today} />;
   if (locked) page = <Login state={auth} />;
 
-  const active = head && ['math', 'code', 'papers', 'archive'].includes(head) ? head : '';
+  const active = head && ['math', 'code', 'papers', 'archive', 'scoreboard'].includes(head) ? head : '';
 
   return (
     <div className="shell">

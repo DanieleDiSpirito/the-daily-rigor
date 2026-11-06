@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { setProgressStore, type ProgressState } from './progress';
 import { setSubmissionStore, type Submission } from './submissions';
+import { computeStats } from './scoring';
 
 /**
  * Per-user storage: the browser keeps a cache (so the UI stays synchronous and works offline),
@@ -38,6 +39,11 @@ export function mergeSubmissions(a: Submission[], b: Submission[]): Submission[]
   return [...byId.values()].sort((x, y) => x.at - y.at);
 }
 
+let flushNow: (() => Promise<void>) | null = null;
+
+/** Uploads pending changes right away (used before reading the scoreboard, so your own row is current). */
+export const syncNow = () => flushNow?.() ?? Promise.resolve();
+
 export async function attachCloud(client: SupabaseClient, uid: string) {
   const pKey = cacheKey('progress', uid), sKey = cacheKey('submissions', uid);
   let progress = read<ProgressState>(pKey, {});
@@ -56,20 +62,27 @@ export async function attachCloud(client: SupabaseClient, uid: string) {
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inflight = Promise.resolve();
+  const upload = () => {
+    inflight = inflight.then(async () => {
+      // Merge with the server first, so another device's progress is not overwritten.
+      const cur = await client.from('user_data').select('progress, submissions').eq('user_id', uid).maybeSingle();
+      const p = mergeProgress(read<ProgressState>(pKey, {}), (cur.data?.progress as ProgressState) ?? {});
+      const s = mergeSubmissions(read<Submission[]>(sKey, []), (cur.data?.submissions as Submission[]) ?? []);
+      write(pKey, p);
+      write(sKey, s);
+      // `stats` feeds the scoreboard; the nickname and visibility are written elsewhere and left untouched here.
+      const row = { user_id: uid, progress: p, submissions: s, updated_at: new Date().toISOString() };
+      const res = await client.from('user_data').upsert({ ...row, stats: computeStats(p) });
+      // Before the database has been updated with the scoreboard columns, keep saving the progress without them.
+      if (res.error && (res.error.code === 'PGRST204' || /\bstats\b/.test(res.error.message))) await client.from('user_data').upsert(row);
+    }).catch(() => {});
+    return inflight;
+  };
   const push = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      inflight = inflight.then(async () => {
-        // Merge with the server first, so another device's progress is not overwritten.
-        const cur = await client.from('user_data').select('progress, submissions').eq('user_id', uid).maybeSingle();
-        const p = mergeProgress(read<ProgressState>(pKey, {}), (cur.data?.progress as ProgressState) ?? {});
-        const s = mergeSubmissions(read<Submission[]>(sKey, []), (cur.data?.submissions as Submission[]) ?? []);
-        write(pKey, p);
-        write(sKey, s);
-        await client.from('user_data').upsert({ user_id: uid, progress: p, submissions: s, updated_at: new Date().toISOString() });
-      }).catch(() => {});
-    }, 800);
+    timer = setTimeout(upload, 800);
   };
+  flushNow = () => { clearTimeout(timer); return upload(); };
 
   setProgressStore({
     load: () => read<ProgressState>(pKey, {}),

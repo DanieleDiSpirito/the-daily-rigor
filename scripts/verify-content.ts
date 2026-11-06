@@ -5,6 +5,10 @@ import { mathPuzzles } from '../src/content/math';
 import { papers } from '../src/content/papers';
 import { tokens, rng } from '../src/lib/rng';
 import { renderRich } from '../src/components/Rich';
+import { computeStats, currentStreak, DIFFICULTY_WEIGHT } from '../src/lib/scoring';
+import { dailyId } from '../src/lib/daily';
+import type { ProgressState } from '../src/lib/progress';
+import type { SectionId } from '../src/types';
 
 let failures = 0;
 const fail = (m: string) => { failures++; console.error('FAIL', m); };
@@ -209,6 +213,54 @@ for (const p of mathPuzzles) {
   const ok = tol === 0 ? v === p.answer : Math.abs(v - p.answer) <= tol * Math.max(1, p.answer);
   console.log(`${p.id}: expected ${p.answer.toFixed(4)}, check ${v.toFixed(4)} ${ok ? 'ok' : 'MISMATCH'}`);
   if (!ok) fail(p.id);
+}
+
+
+// ---- Scoreboard formula ----
+{
+  const mk = (...entries: [SectionId, string, number | 'practice', Partial<ProgressState[string]>?][]): ProgressState => {
+    const out: ProgressState = {};
+    for (const [section, id, ctx, extra] of entries) out[`${section}:${id}:${ctx}`] = { id, section, solved: true, attempts: 1, updatedAt: 0, ...(ctx === 'practice' ? {} : { day: ctx }), ...extra };
+    return out;
+  };
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.06; // scores are rounded to one decimal
+  const maxOf = { math: mathPuzzles.reduce((t, x) => t + DIFFICULTY_WEIGHT[x.difficulty], 0), code: codingProblems.reduce((t, x) => t + x.rating, 0), papers: papers.reduce((t, x) => t + x.readingMinutes, 0) };
+
+  const empty = computeStats({}, 10);
+  if (empty.score !== 0 || empty.math.solved || empty.code.streak || empty.papers.best || empty.math.last !== -1) fail('scoring: empty progress');
+
+  // Each feature, completed perfectly, is worth exactly a third of the overall score.
+  for (const [sec, list] of [['math', mathPuzzles], ['code', codingProblems], ['papers', papers]] as const) {
+    const st = computeStats(mk(...list.map((x): [SectionId, string, 'practice', Partial<ProgressState[string]>] => [sec, x.id, 'practice', sec === 'papers' ? { score: 5, total: 5 } : {}])), 10);
+    if (st[sec].score !== 1000 || !near(st.score, 1000 / 3) || st[sec].solved !== list.length) fail(`scoring: ${sec} fully solved gives ${st[sec].score} / ${st.score}`);
+    for (const other of (['math', 'code', 'papers'] as const).filter((x) => x !== sec)) if (st[other].score !== 0) fail(`scoring: ${other} should be 0`);
+  }
+  const everything = computeStats(mk(...mathPuzzles.map((x): [SectionId, string, 'practice'] => ['math', x.id, 'practice']), ...codingProblems.map((x): [SectionId, string, 'practice'] => ['code', x.id, 'practice']), ...papers.map((x): [SectionId, string, 'practice', Partial<ProgressState[string]>] => ['papers', x.id, 'practice', { score: 4, total: 4 }])), 10);
+  if (everything.score !== 1000) fail(`scoring: everything solved gives ${everything.score}`);
+
+  // Difficulty weights, ratings and quiz correctness.
+  const intro = mathPuzzles.find((x) => x.difficulty === 'Introductory')!, adv = mathPuzzles.find((x) => x.difficulty === 'Advanced');
+  const w = DIFFICULTY_WEIGHT[intro.difficulty] + (adv ? DIFFICULTY_WEIGHT.Advanced : 0);
+  const m = computeStats(mk(['math', intro.id, 'practice'], ...(adv ? [['math', adv.id, 'practice'] as [SectionId, string, 'practice']] : [])), 10);
+  if (!near(m.math.score, (1000 * w) / maxOf.math)) fail(`scoring: math weights ${m.math.score}`);
+  const prob = codingProblems[3];
+  if (!near(computeStats(mk(['code', prob.id, 'practice']), 10).code.score, (1000 * prob.rating) / maxOf.code)) fail('scoring: code rating');
+  const pap = papers[2];
+  if (!near(computeStats(mk(['papers', pap.id, 'practice', { score: 3, total: 5 }]), 10).papers.score, (1000 * pap.readingMinutes * 0.6) / maxOf.papers)) fail('scoring: paper correctness');
+  // The best quiz result across attempts counts; an unsolved (revealed) puzzle counts for nothing.
+  const two = computeStats(mk(['papers', pap.id, 'practice', { score: 1, total: 5 }], ['papers', pap.id, 3, { score: 4, total: 5 }]), 10);
+  if (!near(two.papers.score, (1000 * pap.readingMinutes * 0.8) / maxOf.papers)) fail('scoring: best quiz attempt');
+  if (computeStats(mk(['math', intro.id, 'practice', { solved: false, revealed: true }]), 10).math.solved !== 0) fail('scoring: revealed puzzle counted');
+  // Categories.
+  const cats = computeStats(mk(...papers.map((x): [SectionId, string, 'practice', Partial<ProgressState[string]>] => ['papers', x.id, 'practice', { score: 1, total: 1 }])), 10).cats.papers;
+  for (const c of new Set(papers.flatMap((x) => x.topics))) if (cats[c] !== papers.filter((x) => x.topics.includes(c)).length) fail(`scoring: category ${c}`);
+
+  // Streaks: days 0-2 and 4-5 solved on their own day; a practice solve never extends a streak.
+  const days = mk(...[0, 1, 2, 4, 5].map((d): [SectionId, string, number] => ['math', dailyId('math', d), d]), ['math', dailyId('math', 3), 'practice']);
+  const s5 = computeStats(days, 5).math;
+  if (s5.streak !== 2 || s5.last !== 5 || s5.best !== 3 || currentStreak(s5, 5) !== 2) fail(`scoring: streaks ${JSON.stringify(s5)}`);
+  if (currentStreak(s5, 6) !== 2 || currentStreak(s5, 7) !== 0) fail('scoring: a run ends when two days are missed');
+  if (computeStats(days, 7).math.best !== 3) fail('scoring: longest streak');
 }
 
 // Ids must be unique across the three sections too (progress is keyed by id).
