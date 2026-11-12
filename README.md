@@ -34,7 +34,7 @@ Every day brings three short challenges for the scientifically minded: a puzzle 
 | **II · Algorithm** | A Codeforces-style task: statement, examples, input/output spec, hidden tests including maximal inputs, and an editorial | Run in a Web Worker (JavaScript) or on the C++ judge, with verdicts AC / WA / TLE / RE / CE |
 | **III · Paper** | A landmark but readable paper (Transformers, scaling laws, RLHF, Q-learning, PPO, …) with summary, key ideas, a reading guide and a five-question quiz | Quiz with explanations; your first submission is recorded |
 
-The library holds **28 items per section** (28 puzzles, 28 algorithm problems, 28 papers), with category tags on every item. Papers lean towards machine learning and LLMs, but also include classics such as Turing's *Computing Machinery and Intelligence*, Diffie–Hellman, PageRank and the Bitcoin paper.
+The library holds **36 items per section** (36 puzzles, 36 algorithm problems, 36 papers), enough for every day up to 30 November 2026 without a repeat, with category tags on every item. Papers lean towards machine learning and LLMs, but also include classics such as Turing's *Computing Machinery and Intelligence*, Diffie–Hellman, PageRank, Shannon's information theory and Lamport's logical clocks.
 
 ### Features
 

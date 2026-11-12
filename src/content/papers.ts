@@ -1,6 +1,7 @@
 import type { Paper } from '../types';
 import { withRlWeek } from './schedule';
 import { rlPapers } from './rl-papers';
+import { novPapers } from './nov-papers';
 
 const regularPapers: Paper[] = [
   {
@@ -1621,4 +1622,4 @@ He shows that, under assumptions plausible for many fields, the PPV falls below 
 ];
 
 /** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */
-export const papers: Paper[] = withRlWeek(regularPapers, rlPapers);
+export const papers: Paper[] = withRlWeek([...regularPapers, ...novPapers], rlPapers);

@@ -29,7 +29,7 @@ export const pools = {
 } as const;
 
 /** Day d shows the d-th item of each pool, so nothing repeats until a pool is exhausted
- *  (21 items cover 26 Oct – 15 Nov 2026); after that the pool cycles. Days before the
+ *  (36 items cover 26 Oct – 30 Nov 2026, the reinforcement-learning week included); after that the pool cycles. Days before the
  *  launch show the first item. When a backend exists, replace this with a server-side schedule. */
 export function dailyIndex(section: SectionId, day: number): number {
   return Math.max(day, 0) % pools[section].length;

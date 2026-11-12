@@ -2,6 +2,7 @@ import type { CodingProblem, TestCase } from '../types';
 import { rng, tokens } from '../lib/rng';
 import { withRlWeek } from './schedule';
 import { rlCodingProblems } from './rl-code';
+import { novProblems } from './nov-code';
 
 const T = (input: string): TestCase => ({ input });
 
@@ -1028,6 +1029,7 @@ const regularProblems: CodingProblem[] = [
   rangeXor, noNeighbours, divisibleSubarrays, craters, routers, window, sumFloors,
   pairSums, longestRise, fewestCoins, mazeRunner, cheapestNetwork, nextTaller, primeCensus,
   chooseMod, lootBag, wordMorph, friendCircles, circularFortune, paintCoverage, shortestCover,
+  ...novProblems,
 ];
 
 /** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */

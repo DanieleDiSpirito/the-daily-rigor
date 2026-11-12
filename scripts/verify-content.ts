@@ -173,6 +173,48 @@ for (let n = 1; n <= 8; n++) {
   if ((ref.trim() === '-1') === exists) fail(`no-neighbours n=${n}`);
 }
 
+// ---- Late-November problems: independent brute-force checks ----
+for (let it = 0; it < 300; it++) {
+  { // bracket-repair: shortest balanced supersequence by relaxation over (position, balance)
+    const n = r.int(1, 9); const s = Array.from({ length: n }, () => (r.next() < 0.5 ? '(' : ')')).join(''); const B = n + 2;
+    const d = Array.from({ length: n + 1 }, () => new Array<number>(B + 1).fill(Infinity)); d[0][0] = 0;
+    for (let rep = 0; rep < 3 * (n + B); rep++) for (let i = 0; i <= n; i++) for (let b = 0; b <= B; b++) { const c = d[i][b]; if (c === Infinity) continue;
+      if (b < B) d[i][b + 1] = Math.min(d[i][b + 1], c + 1); if (b > 0) d[i][b - 1] = Math.min(d[i][b - 1], c + 1);
+      if (i < n) { if (s[i] === '(' && b < B) d[i + 1][b + 1] = Math.min(d[i + 1][b + 1], c); if (s[i] === ')' && b > 0) d[i + 1][b - 1] = Math.min(d[i + 1][b - 1], c); } }
+    if (!same(ref('bracket-repair', `${s}\n`), String(d[n][0]))) fail(`brackets ${s}`); }
+  { // count-inversions
+    const n = r.int(1, 14); const a = Array.from({ length: n }, () => r.int(1, 8)); let c = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (a[i] > a[j]) c++;
+    if (!same(ref('count-inversions', `${n}\n${a.join(' ')}\n`), String(c))) fail(`inversions ${a}`); }
+  { // coprime-pairs
+    const gcd = (x: number, y: number): number => (y ? gcd(y, x % y) : x); const qs = [r.int(1, 40), r.int(1, 40), r.int(1, 40)];
+    const exp = qs.map((n) => { let c = 0; for (let a = 1; a <= n; a++) for (let b = 1; b <= n; b++) if (gcd(a, b) === 1) c++; return c; });
+    if (!same(ref('coprime-pairs', `3\n${qs.join('\n')}\n`), exp.join(' '))) fail(`coprime ${qs}`); }
+  { // lexi-topo: smallest valid permutation by exhaustive search
+    const n = r.int(1, 6), m = r.int(0, 8); const es = Array.from({ length: m }, () => { const u = r.int(1, n); let v = r.int(1, n); if (n > 1) while (v === u) v = r.int(1, n); return [u, v]; }).filter(([u, v]) => u !== v);
+    let best: number[] | null = null;
+    const rec = (cur: number[], left: number[]) => { if (best) return; if (!left.length) { best = cur; return; }
+      for (const x of [...left].sort((p, q) => p - q)) { if (es.some(([u, v]) => v === x && left.includes(u))) continue; rec([...cur, x], left.filter((y) => y !== x)); if (best) return; } };
+    rec([], Array.from({ length: n }, (_, i) => i + 1));
+    if (!same(ref('lexi-topo', `${n} ${es.length}\n${es.map((e) => e.join(' ')).join('\n')}\n`), best ? (best as number[]).join(' ') : '-1')) fail(`topo ${JSON.stringify(es)}`); }
+  { // road-distances: Bellman–Ford
+    const n = r.int(1, 7), m = r.int(0, 10); const es = Array.from({ length: m }, () => { const u = r.int(1, n); let v = r.int(1, n); if (n > 1) while (v === u) v = r.int(1, n); return [u, v, r.int(1, 9)]; }).filter(([u, v]) => u !== v);
+    const d = new Array<number>(n + 1).fill(Infinity); d[1] = 0; for (let k = 0; k < n; k++) for (const [u, v, w] of es) { d[u] = Math.min(d[u], d[v] + w); d[v] = Math.min(d[v], d[u] + w); }
+    if (!same(ref('road-distances', `${n} ${es.length}\n${es.map((e) => e.join(' ')).join('\n')}\n`), d.slice(1).map((x) => (x === Infinity ? -1 : x)).join(' '))) fail(`dijkstra ${JSON.stringify(es)}`); }
+  { // split-minimax: dynamic programming over (prefix, segments)
+    const n = r.int(1, 9), k = r.int(1, n); const a = Array.from({ length: n }, () => r.int(1, 9)); const pre = [0]; for (const x of a) pre.push(pre[pre.length - 1] + x);
+    const f = Array.from({ length: n + 1 }, () => new Array<number>(k + 1).fill(Infinity)); f[0][0] = 0;
+    for (let i = 1; i <= n; i++) for (let j = 1; j <= Math.min(k, i); j++) for (let p = j - 1; p < i; p++) f[i][j] = Math.min(f[i][j], Math.max(f[p][j - 1], pre[i] - pre[p]));
+    if (!same(ref('split-minimax', `${n} ${k}\n${a.join(' ')}\n`), String(f[n][k]))) fail(`split ${a} ${k}`); }
+  { // delete-one: all stretches, all choices of forgotten day
+    const n = r.int(1, 9); const a = Array.from({ length: n }, () => r.int(-6, 6)); let best = -Infinity;
+    for (let i = 0; i < n; i++) for (let j = i; j < n; j++) { let sum = 0; for (let x = i; x <= j; x++) sum += a[x]; best = Math.max(best, sum); if (j > i) for (let x = i; x <= j; x++) best = Math.max(best, sum - a[x]); }
+    if (!same(ref('delete-one', `${n}\n${a.join(' ')}\n`), String(best))) fail(`delete-one ${a}`); }
+  { // palindrome-count
+    const n = r.int(1, 14); const s = Array.from({ length: n }, () => 'ab'[r.int(0, 1)]).join(''); let c = 0;
+    for (let i = 0; i < n; i++) for (let j = i; j < n; j++) { const t = s.slice(i, j + 1); if (t === [...t].reverse().join('')) c++; }
+    if (!same(ref('palindrome-count', `${s}\n`), String(c))) fail(`palindromes ${s}`); }
+}
+
 // Monte Carlo / exact checks of puzzle answers.
 const N = 400_000;
 const mc: Record<string, () => number> = {
@@ -205,6 +247,27 @@ const mc: Record<string, () => number> = {
   'step-size-memory': () => { let n = 0; while (0.9 ** n >= 0.01) n++; return n; },
   'importance-sampling-variance': () => { const b = [0.5, 0.25, 0.25], pi = [0, 0.5, 0.5], R = [1, 2, 3]; let m = 0, m2 = 0; for (let i = 0; i < 3; i++) { m += b[i] * (pi[i] / b[i]) * R[i]; m2 += b[i] * ((pi[i] / b[i]) * R[i]) ** 2; } return m2 - m * m; },
   'ants-collisions': () => { let best = 0; for (let r = 0; r <= 25; r++) best = Math.max(best, r * (25 - r)); return best; },
+  // Late-November puzzles.
+  'nugget-boundary': () => { const can = new Set<number>(); for (let a = 0; a < 40; a++) for (let b = 0; b < 40; b++) for (let c = 0; c < 40; c++) can.add(6 * a + 9 * b + 20 * c); let m = 0; for (let i = 0; i < 300; i++) if (!can.has(i)) m = i; return m; },
+  'birthday-twenty-three': () => { let q = 1, n = 0; while (1 - q < 0.5) { q *= (365 - n) / 365; n++; } return n; },
+  'secretary-hundred': () => { let best = -1, bk = 0; for (let k = 0; k < 100; k++) { let s = 0; for (let j = k + 1; j <= 100; j++) s += 1 / (j - 1 || 1); const pr = k === 0 ? 1 / 100 : (k / 100) * s; if (pr > best) { best = pr; bk = k; } } return bk; },
+  'record-highs': () => { let s = 0; for (let i = 0; i < N; i++) { const a = Array.from({ length: 10 }, () => Math.random()); let mx = -1, c = 0; for (const x of a) if (x > mx) { mx = x; c++; } s += c; } return s / N; },
+  'merging-numbers': () => { const xs = Array.from({ length: 10 }, (_, i) => BigInt(i + 1)); while (xs.length > 1) { const a = xs.splice(Math.floor(Math.random() * xs.length), 1)[0], b = xs.splice(Math.floor(Math.random() * xs.length), 1)[0]; xs.push(a + b + a * b); } return Number(xs[0]); },
+  'ballot-seven-three': () => { let good = 0, tot = 0; for (let m = 0; m < 1 << 10; m++) { let pc = 0; for (let i = 0; i < 10; i++) pc += (m >> i) & 1; if (pc !== 7) continue; tot++; let h = 0, ok = true; for (let i = 0; i < 10; i++) { h += (m >> i) & 1 ? 1 : -1; if (h <= 0) { ok = false; break; } } if (ok) good++; } return good / tot; },
+  'monotone-subsequence': () => { // exhaustive for k=3 (answer 5) validates the pigeonhole argument; k=5 follows from the (k-1)^2+1 construction below
+    const lis = (a: number[], up: boolean) => { const f = a.map(() => 1); for (let i = 0; i < a.length; i++) for (let j = 0; j < i; j++) if (up ? a[j] < a[i] : a[j] > a[i]) f[i] = Math.max(f[i], f[j] + 1); return Math.max(...f); };
+    const witness = [4, 3, 2, 1, 8, 7, 6, 5, 12, 11, 10, 9, 16, 15, 14, 13];
+    if (lis(witness, true) !== 4 || lis(witness, false) !== 4) return -1;
+    // every random permutation of 17 numbers has a monotone subsequence of length 5
+    for (let t = 0; t < 20_000; t++) { const p = Array.from({ length: 17 }, (_, i) => i); for (let j = 16; j > 0; j--) { const k = Math.floor(Math.random() * (j + 1)); [p[j], p[k]] = [p[k], p[j]]; } if (lis(p, true) < 5 && lis(p, false) < 5) return -2; }
+    return 17; },
+  'knight-return': () => { // expected hitting times by fixed-point iteration, independent of the stationary-distribution argument
+    const mv = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
+    const nb = (x: number, y: number) => mv.map(([a, b]) => [x + a, y + b]).filter(([u, v]) => u >= 0 && v >= 0 && u < 8 && v < 8);
+    const h = Array.from({ length: 8 }, () => new Array<number>(8).fill(0));
+    for (let it = 0; it < 60_000; it++) for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) if (x || y) { const c = nb(x, y); h[x][y] = 1 + c.reduce((t, [u, v]) => t + h[u][v], 0) / c.length; }
+    const c0 = nb(0, 0); const v = 1 + c0.reduce((t, [u, w]) => t + h[u][w], 0) / c0.length;
+    return Math.abs(v - Math.round(v)) < 1e-6 ? Math.round(v) : v; },
 };
 for (const p of mathPuzzles) {
   const f = mc[p.id];

@@ -1,6 +1,7 @@
 import type { MathPuzzle } from '../types';
 import { withRlWeek } from './schedule';
 import { rlMathPuzzles } from './rl-math';
+import { novMathPuzzles } from './nov-math';
 
 const regularPuzzles: MathPuzzle[] = [
   {
@@ -461,4 +462,4 @@ Since $\\sum (-1)^k/k! \\to 1/e$, the fraction of permutations that are derangem
 ];
 
 /** Regular programme with the RL week (31 Oct – 6 Nov) slotted in after the first five days. */
-export const mathPuzzles: MathPuzzle[] = withRlWeek(regularPuzzles, rlMathPuzzles);
+export const mathPuzzles: MathPuzzle[] = withRlWeek([...regularPuzzles, ...novMathPuzzles], rlMathPuzzles);
