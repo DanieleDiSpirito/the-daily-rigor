@@ -23,7 +23,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 const AUTH = !!(SUPABASE_URL && SUPABASE_KEY);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN; // e.g. https://rigor.example.com; unset = same-origin only when AUTH is on
-const MEMORY_KB = Number(process.env.MEMORY_LIMIT_KB ?? 512 * 1024);
+const MEMORY_KB = Number(process.env.MEMORY_LIMIT_KB ?? 256 * 1024); // per submitted program; keep it well under the host's memory
 const MAX_PARALLEL = Number(process.env.MAX_PARALLEL ?? 4);
 let DAY_TZ = process.env.DAY_TZ || 'Europe/Rome'; // the time zone in which the daily challenge changes, for everyone
 try { new Intl.DateTimeFormat('en', { timeZone: DAY_TZ }); } catch { console.error(`Unknown DAY_TZ "${DAY_TZ}", using UTC.`); DAY_TZ = 'UTC'; }
@@ -91,8 +91,11 @@ function compileNow(code) {
       }
       const id = randomUUID();
       programs.set(id, { dir, bin: join(dir, 'main'), timer: setTimeout(() => dispose(id), TTL_MS) });
-      // The first launch of a fresh binary can be slow (e.g. macOS scanning it); warm it up so timings are fair.
-      run(id, '', 5000).then(() => resolve({ id }));
+      // The first launch of a fresh binary can be slow on macOS (which scans it), so warm it up there so timings are fair.
+      // Not on Linux: it feeds the program an empty input, and a solution that reads without checking and then allocates
+      // from the uninitialised values can grab hundreds of MB, which on a small host is enough to get the whole server killed.
+      if (process.platform === 'darwin') run(id, '', 5000).then(() => resolve({ id }));
+      else resolve({ id });
     });
   });
 }
