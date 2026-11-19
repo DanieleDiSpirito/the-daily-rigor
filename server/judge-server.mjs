@@ -33,7 +33,7 @@ const NTFY_TOKEN = process.env.NTFY_TOKEN; // optional access token for a protec
 const LIMITS = { compile: { n: 12, perMs: 60_000 }, run: { n: 120, perMs: 60_000 }, hello: { n: 6, perMs: 60_000 } };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
 const PCH_DIR = '/opt/pch'; // precompiled <bits/stdc++.h>, built into the Docker image
-const FLAGS = ['-O2', '-std=c++20', '-pipe', ...(existsSync(PCH_DIR) ? [`-I${PCH_DIR}`] : [])];
+const FLAGS = ['-O2', '-std=c++20', ...(existsSync(PCH_DIR) ? [`-I${PCH_DIR}`] : [])];
 
 /** First C++ compiler that can build a program using <bits/stdc++.h> (Apple's clang cannot). */
 function findCompiler() {
@@ -67,7 +67,15 @@ const dispose = (id) => {
   programs.delete(id);
 };
 
+/** One compilation at a time: g++ with the precompiled header takes a few hundred MB, and a small host (512 MB, Node included) cannot afford two. */
+let compiling = Promise.resolve();
 function compile(code) {
+  const result = compiling.then(() => compileNow(code));
+  compiling = result.catch(() => {});
+  return result;
+}
+
+function compileNow(code) {
   const dir = mkdtempSync(join(tmpdir(), 'rigor-'));
   writeFileSync(join(dir, 'main.cpp'), code);
   return new Promise((resolve) => {
